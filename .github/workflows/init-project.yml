@@ -1,0 +1,32 @@
+name: Inicializar Pastas do Projeto
+
+on:
+  workflow_dispatch: # Permite que você ative o script manualmente por um botão
+
+jobs:
+  setup-folders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar código do repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Permissão para salvar as alterações de volta
+
+      - name: Executar comandos Bash
+        run: |
+          # Cria as pastas frontend e backend (a pasta advisor-intelligence já é o próprio repositório)
+          mkdir -p frontend backend
+          
+          # Cria arquivos ocultos .gitkeep para garantir que o Git salve as pastas (pastas vazias são ignoradas pelo Git)
+          touch frontend/.gitkeep
+          touch backend/.gitkeep
+
+      - name: Salvar e enviar alterações para o GitHub
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@://github.com"
+          
+          git add frontend/ backend/
+          git commit -m "Estrutura inicial: pastas frontend e backend criadas"
+          git push
