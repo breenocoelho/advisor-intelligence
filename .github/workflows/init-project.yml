@@ -3,6 +3,9 @@ name: Inicializar Pastas do Projeto
 on:
   workflow_dispatch: # Permite que você ative o script manualmente por um botão
 
+permissions:
+  contents: write
+
 jobs:
   setup-folders:
     runs-on: ubuntu-latest
@@ -10,8 +13,6 @@ jobs:
     steps:
       - name: Verificar código do repositório
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }} # Permissão para salvar as alterações de volta
 
       - name: Executar comandos Bash
         run: |
