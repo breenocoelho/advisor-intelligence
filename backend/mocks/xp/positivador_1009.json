@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1009,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2550.0,
+    "financialApplications": 255000.0,
+    "revenueInMonth": 255.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1009,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2700.0,
+    "financialApplications": 270000.0,
+    "revenueInMonth": 270.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1009,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2850.0,
+    "financialApplications": 285000.0,
+    "revenueInMonth": 285.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1009,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 3000.0,
+    "financialApplications": 300000.0,
+    "revenueInMonth": 300.0,
+    "suitability": "MODERADO"
+  }
+]

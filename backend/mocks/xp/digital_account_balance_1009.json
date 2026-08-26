@@ -1,0 +1,13 @@
+{
+  "agency": 1,
+  "tradingAccount": 1009,
+  "amount": 1000.0,
+  "blockedAmount": 0.0,
+  "amountWithOverdraft": 1000.0,
+  "overdraft": {
+    "limit": 500.0,
+    "available": 500.0,
+    "consumed": 0.0
+  },
+  "lastChangeDate": "2026-08-26T00:00:00"
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1004,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 4250.0,
+    "financialApplications": 425000.0,
+    "revenueInMonth": 425.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1004,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 4500.0,
+    "financialApplications": 450000.0,
+    "revenueInMonth": 450.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1004,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 4750.0,
+    "financialApplications": 475000.0,
+    "revenueInMonth": 475.0,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1004,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 5000.0,
+    "financialApplications": 500000.0,
+    "revenueInMonth": 500.0,
+    "suitability": "MODERADO"
+  }
+]

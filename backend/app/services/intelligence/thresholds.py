@@ -1,0 +1,54 @@
+"""
+Modulo central de thresholds. Antes, cada regra do alert_engine tinha sua
+propria constante hardcoded; agora todo mundo (alert_engine, signals,
+health_score) resolve o valor por aqui, permitindo parametrizacao por
+perfil de suitability sem que cada chamador saiba de onde o numero vem.
+
+Resolucao (get_threshold): regra especifica do perfil do cliente -> default
+da org -> default do sistema (hardcoded abaixo, nunca falha).
+"""
+from decimal import Decimal
+
+from app.models import ThresholdRule
+
+DEFAULT_THRESHOLDS: dict[str, Decimal] = {
+    "idle_cash": Decimal("0.20"),
+    "concentration": Decimal("0.40"),
+    "concentration_issuer": Decimal("0.40"),
+    "upcoming_maturity_days": Decimal("30"),
+    "relevant_movement": Decimal("0.20"),
+    "no_contact_days": Decimal("30"),
+    "health_score_good": Decimal("80"),
+    "health_score_warn": Decimal("60"),
+}
+
+
+def get_threshold(db, signal_key: str, org_id, client=None) -> Decimal:
+    suitability = getattr(client, "suitability", None)
+
+    if suitability:
+        rule = (
+            db.query(ThresholdRule)
+            .filter(
+                ThresholdRule.org_id == org_id,
+                ThresholdRule.signal_key == signal_key,
+                ThresholdRule.suitability_profile == suitability,
+            )
+            .first()
+        )
+        if rule is not None:
+            return Decimal(rule.value)
+
+    org_default = (
+        db.query(ThresholdRule)
+        .filter(
+            ThresholdRule.org_id == org_id,
+            ThresholdRule.signal_key == signal_key,
+            ThresholdRule.suitability_profile.is_(None),
+        )
+        .first()
+    )
+    if org_default is not None:
+        return Decimal(org_default.value)
+
+    return DEFAULT_THRESHOLDS[signal_key]
