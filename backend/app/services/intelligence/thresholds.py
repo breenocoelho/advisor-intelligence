@@ -20,11 +20,27 @@ DEFAULT_THRESHOLDS: dict[str, Decimal] = {
     "no_contact_days": Decimal("30"),
     "health_score_good": Decimal("80"),
     "health_score_warn": Decimal("60"),
+    # cadencia de contato por tier de cliente (Relationship Intelligence) --
+    # nao e' regra fixa no codigo, e' configuravel por org via /config/thresholds
+    "high_value_aum_threshold": Decimal("1000000"),
+    "contact_cadence_high_value_days": Decimal("30"),
+    "contact_cadence_standard_days": Decimal("60"),
+    "contact_cadence_low_engagement_days": Decimal("90"),
+    "relationship_score_good": Decimal("80"),
+    "relationship_score_warn": Decimal("60"),
 }
 
 
-def get_threshold(db, signal_key: str, org_id, client=None) -> Decimal:
+def get_threshold(db, signal_key: str, org_id, client=None, cache: dict | None = None) -> Decimal:
+    """cache (opcional): dict pre-carregado por preload_threshold_cache, pra
+    resolver em memoria em vez de bater no banco a cada chamada -- usado
+    pelos endpoints que resolvem threshold pra muitos clientes na mesma
+    requisicao (ex: lista de clientes), onde uma query por (regra, cliente)
+    vira centenas de round-trips."""
     suitability = getattr(client, "suitability", None)
+
+    if cache is not None:
+        return cache.get((signal_key, suitability), cache.get((signal_key, None), DEFAULT_THRESHOLDS[signal_key]))
 
     if suitability:
         rule = (
@@ -52,3 +68,20 @@ def get_threshold(db, signal_key: str, org_id, client=None) -> Decimal:
         return Decimal(org_default.value)
 
     return DEFAULT_THRESHOLDS[signal_key]
+
+
+def preload_threshold_cache(db, org_id, signal_keys: list[str]) -> dict:
+    """Busca todas as ThresholdRule relevantes da org numa unica query e
+    monta um dict {(signal_key, suitability_profile_ou_None): Decimal},
+    ja' resolvendo o default do sistema pras chaves sem nenhum override.
+    Passar o resultado pra get_threshold(..., cache=...) evita 1 query por
+    (regra, cliente)."""
+    rules = (
+        db.query(ThresholdRule)
+        .filter(ThresholdRule.org_id == org_id, ThresholdRule.signal_key.in_(signal_keys))
+        .all()
+    )
+    cache: dict = {(key, None): DEFAULT_THRESHOLDS[key] for key in signal_keys if key in DEFAULT_THRESHOLDS}
+    for rule in rules:
+        cache[(rule.signal_key, rule.suitability_profile)] = Decimal(rule.value)
+    return cache

@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1032,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 18113.5,
+    "financialApplications": 1811350.0,
+    "revenueInMonth": 1811.35,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1032,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 19179.0,
+    "financialApplications": 1917900.0,
+    "revenueInMonth": 1917.9,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1032,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 20244.5,
+    "financialApplications": 2024450.0,
+    "revenueInMonth": 2024.45,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1032,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 21310.0,
+    "financialApplications": 2131000.0,
+    "revenueInMonth": 2131.0,
+    "suitability": "MODERADO"
+  }
+]

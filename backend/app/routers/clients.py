@@ -8,12 +8,20 @@ from app.auth import get_current_user
 from app.deps import get_db
 from app.models import (
     Client, Organization, Advisor, ClientAdvisorHistory, Alert, Asset, Position, Task,
-    Insight, ClientDailySnapshot, Account,
+    Insight, ClientDailySnapshot, Account, ClientInteraction, ClientFieldOverride,
+    ClientExtendedFieldAssignment, ClientExtendedFieldOption, ClientExtendedFieldDefinition,
 )
 from app.schemas import (
     ClientOut, ClientDetailOut, AlertOut, PositionOut, TaskOut, InsightOut, SnapshotPointOut,
+    InteractionOut, RelationshipOverviewItem, ClientAnalyticsOut, PortfolioEvolutionItem,
+    CashAnalyticsOut, FlowAnalyticsOut, AssetClassSeriesOut, ValueTrendPointOut, PerformanceAttributionItem,
+    FieldOverrideOut, FieldOverrideIn, ClientExtendedFieldAssignmentOut,
 )
 from app.services.intelligence.position_queries import latest_positions_query
+from app.services.intelligence.relationship_score import compute_relationship_score, get_contact_cadence_days, score_breakdown
+from app.services.intelligence.health_score import health_score_breakdown
+from app.services.intelligence.thresholds import preload_threshold_cache
+from app.services.audit import log_action
 
 router = APIRouter()
 
@@ -46,6 +54,8 @@ def _build_position_out(position: Position, asset: Asset) -> PositionOut:
         issuer=asset.issuer,
         rate=float(asset.rate) if asset.rate is not None else None,
         index_description=asset.index_description,
+        manager_name=asset.manager_name,
+        risk_rating=asset.risk_rating,
         position_date=position.position_date,
         period_purchase_value=float(position.period_purchase_value or 0),
         period_sale_value=float(position.period_sale_value or 0),
@@ -95,6 +105,44 @@ def list_clients(
         .filter(Client.org_id == org_id)
         .all()
     )
+    client_ids = [c.id for c, _ in clients]
+
+    # historico de snapshots (health score + estabilidade de AUM p/ relationship score),
+    # buscado uma vez so' e agrupado em memoria -- evita 1 query por cliente
+    all_snapshots = (
+        db.query(ClientDailySnapshot)
+        .filter(ClientDailySnapshot.org_id == org_id)
+        .order_by(ClientDailySnapshot.client_id, ClientDailySnapshot.snapshot_date)
+        .all()
+    )
+    snapshots_by_client: dict[uuid.UUID, list] = {}
+    for s in all_snapshots:
+        snapshots_by_client.setdefault(s.client_id, []).append(s)
+
+    all_interactions = (
+        db.query(ClientInteraction).filter(ClientInteraction.client_id.in_(client_ids)).all()
+        if client_ids else []
+    )
+    interactions_by_client: dict[uuid.UUID, list] = {}
+    for i in all_interactions:
+        interactions_by_client.setdefault(i.client_id, []).append(i)
+
+    all_tasks = (
+        db.query(Task).filter(Task.client_id.in_(client_ids)).all()
+        if client_ids else []
+    )
+    tasks_by_client: dict[uuid.UUID, list] = {}
+    for t in all_tasks:
+        tasks_by_client.setdefault(t.client_id, []).append(t)
+
+    # 1 query pra todos os thresholds usados no health/relationship score,
+    # em vez de ~8 por cliente -- era o gargalo desse endpoint (centenas de
+    # round-trips sequenciais pro Postgres do Railway)
+    threshold_cache = preload_threshold_cache(db, org_id, [
+        "idle_cash", "concentration_issuer", "high_value_aum_threshold",
+        "contact_cadence_high_value_days", "contact_cadence_standard_days", "contact_cadence_low_engagement_days",
+        "relationship_score_good", "relationship_score_warn",
+    ])
 
     results = []
     for client, advisor_name in clients:
@@ -102,14 +150,79 @@ def list_clients(
         active_alerts_count = sum(severities.values())
         priority_score = sum(SEVERITY_WEIGHT.get(sev, 0) * cnt for sev, cnt in severities.items())
 
+        client_snapshots = snapshots_by_client.get(client.id, [])
+        latest_snapshot = client_snapshots[-1] if client_snapshots else None
+
         item = ClientOut.model_validate(client)
         item.advisor_name = advisor_name
         item.active_alerts_count = active_alerts_count
         item.priority_score = priority_score
+
+        item.health_score = latest_snapshot.health_score if latest_snapshot else None
+        item.health_score_breakdown = health_score_breakdown(db, org_id, client, latest_snapshot, cache=threshold_cache)
+
+        relationship = compute_relationship_score(
+            db, org_id, client,
+            interactions=interactions_by_client.get(client.id, []),
+            tasks=tasks_by_client.get(client.id, []),
+            aum_history=[s.aum for s in client_snapshots],
+            cache=threshold_cache,
+        )
+        item.relationship_score = relationship.score
+        item.relationship_score_band = relationship.band
+        item.relationship_score_breakdown = score_breakdown(relationship)
+
         results.append(item)
 
     # ordena por prioridade, nao mais so por AUM -- "diga quem merece atencao primeiro"
     results.sort(key=lambda c: c.priority_score, reverse=True)
+    return results
+
+
+@router.get("/relationship-overview", response_model=list[RelationshipOverviewItem])
+def relationship_overview(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Base do bloco 'Relationship' no Today e da contagem 🔴🟡🟢 -- por
+    cliente, ha quanto tempo sem contato vs a cadencia esperada pro tier
+    dele (Relationship Intelligence, Etapa 3)."""
+    org_id = resolve_org_id(current_user, db)
+    if org_id is None:
+        return []
+
+    today = date.today()
+    clients = db.query(Client).filter(Client.org_id == org_id).all()
+
+    client_ids_with_interaction = {
+        row[0] for row in
+        db.query(ClientInteraction.client_id).filter(ClientInteraction.client_id.in_([c.id for c in clients])).distinct().all()
+    }
+    threshold_cache = preload_threshold_cache(db, org_id, [
+        "high_value_aum_threshold", "contact_cadence_high_value_days",
+        "contact_cadence_standard_days", "contact_cadence_low_engagement_days",
+    ])
+
+    results = []
+    for client in clients:
+        has_interaction = client.id in client_ids_with_interaction
+        cadence_days = int(get_contact_cadence_days(db, org_id, client, has_any_interaction=has_interaction, cache=threshold_cache))
+        days_since = (today - client.last_contact_at.date()).days if client.last_contact_at else None
+
+        if days_since is None or days_since > cadence_days:
+            item_status = "overdue"
+        elif days_since > cadence_days * 0.7:
+            item_status = "approaching"
+        else:
+            item_status = "ok"
+
+        results.append(RelationshipOverviewItem(
+            id=client.id, name=client.name, days_since_contact=days_since,
+            cadence_days=cadence_days, status=item_status,
+        ))
+
+    # nunca contatado vem primeiro (mais urgente), depois por dias sem contato desc
+    results.sort(key=lambda r: (0 if r.days_since_contact is None else 1, -(r.days_since_contact or 0)))
     return results
 
 
@@ -198,9 +311,328 @@ def get_client_detail(
         )
         for s in snapshot_rows
     ]
-    item.health_score = snapshot_rows[-1].health_score if snapshot_rows else None
+    latest_snapshot = snapshot_rows[-1] if snapshot_rows else None
+    item.health_score = latest_snapshot.health_score if latest_snapshot else None
+    item.health_score_breakdown = health_score_breakdown(db, org_id, client_row, latest_snapshot)
+
+    interactions_rows = (
+        db.query(ClientInteraction)
+        .filter(ClientInteraction.client_id == client_row.id)
+        .order_by(ClientInteraction.interaction_date.desc())
+        .all()
+    )
+    item.interactions = [InteractionOut.model_validate(i) for i in interactions_rows]
+
+    relationship = compute_relationship_score(
+        db, org_id, client_row,
+        interactions=interactions_rows,
+        tasks=tasks_rows,
+        aum_history=[s.aum for s in snapshot_rows],
+    )
+    item.relationship_score = relationship.score
+    item.relationship_score_band = relationship.band
+    item.relationship_score_breakdown = score_breakdown(relationship)
+    item.relationship_score_components = relationship.components
+    item.relationship_score_explanation = relationship.explanation
+
+    overrides = db.query(ClientFieldOverride).filter(ClientFieldOverride.client_id == client_row.id).all()
+    item.field_overrides = {o.field_name: o.override_value for o in overrides}
+
+    extended_rows = (
+        db.query(ClientExtendedFieldAssignment, ClientExtendedFieldOption, ClientExtendedFieldDefinition)
+        .join(ClientExtendedFieldOption, ClientExtendedFieldAssignment.option_id == ClientExtendedFieldOption.id)
+        .join(ClientExtendedFieldDefinition, ClientExtendedFieldOption.field_definition_id == ClientExtendedFieldDefinition.id)
+        .filter(ClientExtendedFieldAssignment.client_id == client_row.id)
+        .all()
+    )
+    item.extended_fields = [
+        ClientExtendedFieldAssignmentOut(
+            assignment_id=assignment.id, field_key=definition.key, field_label=definition.label,
+            option_id=option.id, option_value=option.value,
+        )
+        for assignment, option, definition in extended_rows
+    ]
 
     return item
+
+
+@router.get("/{client_id}/field-overrides", response_model=list[FieldOverrideOut])
+def list_field_overrides(
+    client_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    rows = db.query(ClientFieldOverride).filter(ClientFieldOverride.client_id == client_row.id).all()
+    return [FieldOverrideOut(field_name=r.field_name, override_value=r.override_value, created_at=r.created_at) for r in rows]
+
+
+@router.put("/{client_id}/field-overrides/{field_name}", response_model=FieldOverrideOut)
+def set_field_override(
+    client_id: str,
+    field_name: str,
+    payload: FieldOverrideIn,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    override = (
+        db.query(ClientFieldOverride)
+        .filter(ClientFieldOverride.client_id == client_row.id, ClientFieldOverride.field_name == field_name)
+        .first()
+    )
+    if override is None:
+        override = ClientFieldOverride(client_id=client_row.id, field_name=field_name, override_value=payload.value)
+        db.add(override)
+    else:
+        override.override_value = payload.value
+
+    log_action(
+        db, org_id, "field_override_set",
+        f"Campo '{field_name}' de {client_row.name} sobrescrito para \"{payload.value}\"",
+        client_id=client_row.id,
+    )
+    db.commit()
+    db.refresh(override)
+    return FieldOverrideOut(field_name=override.field_name, override_value=override.override_value, created_at=override.created_at)
+
+
+@router.delete("/{client_id}/field-overrides/{field_name}", status_code=http_status.HTTP_204_NO_CONTENT)
+def delete_field_override(
+    client_id: str,
+    field_name: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    override = (
+        db.query(ClientFieldOverride)
+        .filter(ClientFieldOverride.client_id == client_row.id, ClientFieldOverride.field_name == field_name)
+        .first()
+    )
+    if override is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Override não encontrado")
+
+    db.delete(override)
+    log_action(db, org_id, "field_override_removed", f"Override do campo '{field_name}' de {client_row.name} removido", client_id=client_row.id)
+    db.commit()
+    return None
+
+
+@router.get("/{client_id}/analytics", response_model=ClientAnalyticsOut)
+def get_client_analytics(
+    client_id: str,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Consolida AUM evolution, portfolio evolution (em pp), cash e flow
+    analytics numa resposta so -- reaproveita client_daily_snapshot como
+    fonte unica, filtrado por from/to (Analytics, Etapa 2)."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    query = db.query(ClientDailySnapshot).filter(ClientDailySnapshot.client_id == client_row.id)
+    if from_date:
+        query = query.filter(ClientDailySnapshot.snapshot_date >= from_date)
+    if to_date:
+        query = query.filter(ClientDailySnapshot.snapshot_date <= to_date)
+    snapshots = query.order_by(ClientDailySnapshot.snapshot_date).all()
+
+    aum_trend = [
+        SnapshotPointOut(
+            snapshot_date=s.snapshot_date,
+            aum=float(s.aum) if s.aum is not None else None,
+            health_score=s.health_score,
+        )
+        for s in snapshots
+    ]
+
+    aum_change_pct = None
+    if snapshots and snapshots[0].aum and float(snapshots[0].aum) > 0:
+        aum_change_pct = (float(snapshots[-1].aum or 0) - float(snapshots[0].aum)) / float(snapshots[0].aum) * 100
+
+    portfolio_evolution: list[PortfolioEvolutionItem] = []
+    if len(snapshots) >= 2 and snapshots[0].allocation_json and snapshots[-1].allocation_json:
+        start_alloc = snapshots[0].allocation_json
+        end_alloc = snapshots[-1].allocation_json
+        for asset_class in sorted(set(start_alloc) | set(end_alloc)):
+            pct_start = float(start_alloc.get(asset_class, 0)) * 100
+            pct_end = float(end_alloc.get(asset_class, 0)) * 100
+            portfolio_evolution.append(PortfolioEvolutionItem(
+                asset_class=asset_class, pct_start=pct_start, pct_end=pct_end, delta_pp=pct_end - pct_start,
+            ))
+        portfolio_evolution.sort(key=lambda p: abs(p.delta_pp), reverse=True)
+
+    # serie completa por classe (nao so' inicio/fim) -- alimenta o grafico
+    # de tendencia ao lado da tabela de Portfolio Evolution
+    class_series_map: dict[str, list[SnapshotPointOut]] = {}
+    for s in snapshots:
+        if not s.allocation_json or s.aum is None:
+            continue
+        for asset_class, pct in s.allocation_json.items():
+            class_series_map.setdefault(asset_class, []).append(
+                SnapshotPointOut(snapshot_date=s.snapshot_date, aum=float(pct) * float(s.aum), health_score=None)
+            )
+    class_series = [
+        AssetClassSeriesOut(asset_class=asset_class, points=points)
+        for asset_class, points in sorted(class_series_map.items())
+    ]
+
+    cash_analytics = None
+    if snapshots:
+        cash_values = [float(s.liquidity_pct or 0) * float(s.aum or 0) for s in snapshots]
+        latest_liquidity_pct = snapshots[-1].liquidity_pct
+        cash_analytics = CashAnalyticsOut(
+            current=cash_values[-1],
+            average=sum(cash_values) / len(cash_values),
+            max=max(cash_values),
+            pct_of_aum_current=float(latest_liquidity_pct) * 100 if latest_liquidity_pct is not None else None,
+        )
+
+    flow_analytics = None
+    if snapshots:
+        gross_inflow = sum(float(s.monthly_purchase_value or 0) for s in snapshots)
+        gross_outflow = sum(float(s.monthly_sale_value or 0) for s in snapshots)
+        flow_analytics = FlowAnalyticsOut(
+            gross_inflow=gross_inflow, gross_outflow=gross_outflow, net_flow=gross_inflow - gross_outflow,
+        )
+
+    return ClientAnalyticsOut(
+        aum_trend=aum_trend,
+        aum_change_pct=aum_change_pct,
+        portfolio_evolution=portfolio_evolution,
+        class_series=class_series,
+        cash_analytics=cash_analytics,
+        flow_analytics=flow_analytics,
+    )
+
+
+@router.get("/{client_id}/value-trend", response_model=list[ValueTrendPointOut])
+def get_value_trend(
+    client_id: str,
+    scope: str = Query(..., pattern="^(aum|class|asset)$"),
+    key: str | None = Query(default=None),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Serie de valor no tempo para o grafico de evolucao do Portfolio
+    Analytics -- AUM total, uma classe de ativo, ou um ativo especifico
+    (comparavel a um benchmark no frontend). Reaproveita
+    client_daily_snapshot para AUM/classe e Position historico (por
+    position_date) para um ativo especifico."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    if scope == "aum":
+        rows = (
+            db.query(ClientDailySnapshot.snapshot_date, ClientDailySnapshot.aum)
+            .filter(ClientDailySnapshot.client_id == client_row.id)
+            .order_by(ClientDailySnapshot.snapshot_date)
+            .all()
+        )
+        return [ValueTrendPointOut(value_date=d, value=float(v or 0)) for d, v in rows]
+
+    if scope == "class":
+        if not key:
+            return []
+        rows = (
+            db.query(ClientDailySnapshot.snapshot_date, ClientDailySnapshot.allocation_json, ClientDailySnapshot.aum)
+            .filter(ClientDailySnapshot.client_id == client_row.id)
+            .order_by(ClientDailySnapshot.snapshot_date)
+            .all()
+        )
+        return [
+            ValueTrendPointOut(value_date=d, value=float((alloc or {}).get(key, 0)) * float(aum or 0))
+            for d, alloc, aum in rows
+        ]
+
+    # scope == "asset"
+    if not key:
+        return []
+    rows = (
+        db.query(Position.position_date, func.sum(Position.market_value))
+        .join(Account, Position.account_id == Account.id)
+        .filter(Account.client_id == client_row.id, Position.asset_id == key)
+        .group_by(Position.position_date)
+        .order_by(Position.position_date)
+        .all()
+    )
+    return [ValueTrendPointOut(value_date=d, value=float(v or 0)) for d, v in rows]
+
+
+@router.get("/{client_id}/performance-attribution", response_model=list[PerformanceAttributionItem])
+def get_performance_attribution(
+    client_id: str,
+    date_a: date = Query(..., alias="from"),
+    date_b: date = Query(..., alias="to"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Quanto cada ativo contribuiu para a variacao do patrimonio no
+    periodo. Heuristica simples e explicavel (nao um modelo de
+    atribuicao formal): performance = variacao de valor menos o fluxo
+    (aporte/resgate) registrado no periodo em cada posicao, contribuicao
+    = performance sobre o PL total no inicio do periodo."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    def positions_at(on_date: date):
+        return (
+            db.query(Position, Asset)
+            .join(Asset, Position.asset_id == Asset.id)
+            .join(Account, Position.account_id == Account.id)
+            .filter(Account.client_id == client_row.id, Position.position_date == on_date)
+            .all()
+        )
+
+    rows_a = {asset.id: (position, asset) for position, asset in positions_at(date_a)}
+    rows_b = {asset.id: (position, asset) for position, asset in positions_at(date_b)}
+    total_a = sum(float(p.market_value or 0) for p, _ in rows_a.values())
+    if total_a <= 0:
+        return []
+
+    items = []
+    for asset_id in set(rows_a) | set(rows_b):
+        pos_a, asset_a = rows_a.get(asset_id, (None, None))
+        pos_b, asset_b = rows_b.get(asset_id, (None, None))
+        asset = asset_b or asset_a
+        value_a = float(pos_a.market_value) if pos_a and pos_a.market_value else 0.0
+        value_b = float(pos_b.market_value) if pos_b and pos_b.market_value else 0.0
+        net_flow = float((pos_b.period_purchase_value or 0) - (pos_b.period_sale_value or 0)) if pos_b else 0.0
+        performance_value = (value_b - value_a) - net_flow
+        items.append(PerformanceAttributionItem(
+            asset_id=asset_id,
+            asset_name=asset.name,
+            asset_class=asset.asset_class,
+            value_start=value_a,
+            value_end=value_b,
+            net_flow=net_flow,
+            performance_value=performance_value,
+            contribution_pct=performance_value / total_a * 100,
+        ))
+
+    items.sort(key=lambda i: abs(i.contribution_pct), reverse=True)
+    return items
 
 
 @router.get("/{client_id}/position-dates", response_model=list[date])
@@ -266,7 +698,21 @@ def register_contact(
     if client_row is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
 
+    current_advisor_id = (
+        db.query(ClientAdvisorHistory.advisor_id)
+        .filter(ClientAdvisorHistory.client_id == client_row.id, ClientAdvisorHistory.valid_to.is_(None))
+        .scalar()
+    )
+
     client_row.last_contact_at = datetime.utcnow()
+    db.add(ClientInteraction(
+        client_id=client_row.id,
+        advisor_id=current_advisor_id,
+        interaction_type="Other",
+        interaction_date=date.today(),
+        subject="Contato rápido",
+    ))
+    log_action(db, org_id, "contact_registered", f"Contato rápido registrado com {client_row.name}", client_id=client_row.id)
     db.commit()
 
     return get_client_detail(client_id, current_user, db)

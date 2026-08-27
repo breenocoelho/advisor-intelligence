@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1041,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 15198.0,
+    "financialApplications": 1519800.0,
+    "revenueInMonth": 1519.8,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1041,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 16092.0,
+    "financialApplications": 1609200.0,
+    "revenueInMonth": 1609.2,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1041,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 16986.0,
+    "financialApplications": 1698600.0,
+    "revenueInMonth": 1698.6,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1041,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 17880.0,
+    "financialApplications": 1788000.0,
+    "revenueInMonth": 1788.0,
+    "suitability": "CONSERVADOR"
+  }
+]

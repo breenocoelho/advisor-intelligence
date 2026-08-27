@@ -7,6 +7,7 @@ from app.deps import get_db
 from app.models import Alert, Client, Task
 from app.schemas import AlertOut, TaskOut, TaskCreate
 from app.routers.clients import resolve_org_id
+from app.services.audit import log_action
 
 router = APIRouter()
 
@@ -23,7 +24,7 @@ def list_alerts(
         return []
 
     query = (
-        db.query(Alert, Client.name.label("client_name"))
+        db.query(Alert, Client.name, Client.suitability)
         .join(Client, Alert.client_id == Client.id)
         .filter(Client.org_id == org_id)
     )
@@ -36,9 +37,10 @@ def list_alerts(
     rows = query.order_by(Alert.severity, Alert.created_at.desc()).all()
 
     results = []
-    for alert, client_name in rows:
+    for alert, client_name, client_suitability in rows:
         item = AlertOut.model_validate(alert)
         item.client_name = client_name
+        item.client_suitability = client_suitability
         results.append(item)
     return results
 
@@ -47,6 +49,7 @@ def list_alerts(
 def update_alert_status(
     alert_id: str,
     new_status: str = Query(..., description="new | viewed | dismissed | actioned"),
+    note: str | None = Query(default=None, description="por que foi acionado/descartado"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -61,6 +64,8 @@ def update_alert_status(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Alerta não encontrado")
 
     alert.status = new_status
+    if note is not None:
+        alert.resolution_note = note
     db.commit()
     db.refresh(alert)
 
@@ -94,11 +99,19 @@ def create_task_from_alert(
     task = Task(
         client_id=alert.client_id,
         alert_id=alert.id,
+        asset_id=alert.asset_id,
         description=(payload.description or alert.explanation or f"Follow-up: {alert.alert_type}"),
         due_date=(payload.due_date or (date.today() + timedelta(days=7))),
         status="pending",
     )
     db.add(task)
+
+    client = db.query(Client).filter(Client.id == alert.client_id).first()
+    log_action(
+        db, org_id, "task_created",
+        f"Tarefa criada para {client.name if client else 'cliente'} a partir de alerta ({alert.alert_type}): \"{task.description}\"",
+        client_id=alert.client_id,
+    )
     db.commit()
     db.refresh(task)
 

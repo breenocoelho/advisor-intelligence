@@ -20,6 +20,7 @@ class Task(Base):
     alert_id = Column(UUID(as_uuid=True), ForeignKey("alerts.id"), nullable=True)
     insight_id = Column(UUID(as_uuid=True), ForeignKey("insights.id"), nullable=True)
     opportunity_id = Column(UUID(as_uuid=True), nullable=True)  # FK a adicionar quando "opportunities" existir (Phase 4)
+    asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.id"), nullable=True)  # tag informativa, nao conta pro CHECK de origem
     description = Column(String, nullable=False)
     due_date = Column(Date, nullable=True)
     status = Column(String, nullable=False, default="pending")  # pending | done

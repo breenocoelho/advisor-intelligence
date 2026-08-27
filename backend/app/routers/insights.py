@@ -7,6 +7,7 @@ from app.deps import get_db
 from app.models import Insight, Client, Task
 from app.schemas import InsightOut, TaskOut, TaskCreate
 from app.routers.clients import resolve_org_id
+from app.services.audit import log_action
 
 router = APIRouter()
 
@@ -23,7 +24,7 @@ def list_insights(
         return []
 
     query = (
-        db.query(Insight, Client.name.label("client_name"))
+        db.query(Insight, Client.name, Client.suitability)
         .join(Client, Insight.client_id == Client.id)
         .filter(Insight.org_id == org_id)
     )
@@ -36,9 +37,10 @@ def list_insights(
     rows = query.order_by(Insight.severity, Insight.created_at.desc()).all()
 
     results = []
-    for insight, client_name in rows:
+    for insight, client_name, client_suitability in rows:
         item = InsightOut.model_validate(insight)
         item.client_name = client_name
+        item.client_suitability = client_suitability
         results.append(item)
     return results
 
@@ -47,6 +49,7 @@ def list_insights(
 def update_insight_status(
     insight_id: str,
     new_status: str = Query(..., description="new | viewed | dismissed | actioned"),
+    note: str | None = Query(default=None, description="por que foi acionado/descartado"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -60,6 +63,8 @@ def update_insight_status(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Insight não encontrado")
 
     insight.status = new_status
+    if note is not None:
+        insight.resolution_note = note
     db.commit()
     db.refresh(insight)
 
@@ -93,6 +98,13 @@ def create_task_from_insight(
         status="pending",
     )
     db.add(task)
+
+    client = db.query(Client).filter(Client.id == insight.client_id).first()
+    log_action(
+        db, org_id, "task_created",
+        f"Tarefa criada para {client.name if client else 'cliente'} a partir de insight ({insight.insight_type}): \"{task.description}\"",
+        client_id=insight.client_id,
+    )
     db.commit()
     db.refresh(task)
 

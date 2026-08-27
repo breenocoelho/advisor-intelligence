@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import ClientesTable from "./ClientesTable";
+import type { ScoreBreakdownItem } from "../ScoreTooltip";
 
 type Client = {
   id: string;
@@ -10,6 +11,11 @@ type Client = {
   advisor_name: string | null;
   active_alerts_count: number;
   priority_score: number;
+  health_score: number | null;
+  health_score_breakdown: ScoreBreakdownItem[];
+  relationship_score: number | null;
+  relationship_score_band: string | null;
+  relationship_score_breakdown: ScoreBreakdownItem[];
 };
 
 async function getClients(): Promise<Client[]> {
@@ -29,7 +35,7 @@ export default async function ClientesPage() {
   const clients = await getClients();
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10 sm:py-14">
+    <main className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
       <header className="mb-8 flex items-end justify-between border-b border-[#14181F]/10 pb-6">
         <div>
           <p className="text-sm text-[#14181F]/50">Carteira</p>

@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1014,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 8508.5,
+    "financialApplications": 850850.0,
+    "revenueInMonth": 850.85,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1014,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 9009.0,
+    "financialApplications": 900900.0,
+    "revenueInMonth": 900.9,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1014,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 9509.5,
+    "financialApplications": 950950.0,
+    "revenueInMonth": 950.95,
+    "suitability": "CONSERVADOR"
+  },
+  {
+    "accountCode": 1014,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 10010.0,
+    "financialApplications": 1001000.0,
+    "revenueInMonth": 1001.0,
+    "suitability": "CONSERVADOR"
+  }
+]

@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1025,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2405.5,
+    "financialApplications": 240550.0,
+    "revenueInMonth": 240.55,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1025,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2547.0,
+    "financialApplications": 254700.0,
+    "revenueInMonth": 254.7,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1025,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2688.5,
+    "financialApplications": 268850.0,
+    "revenueInMonth": 268.85,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1025,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 2830.0,
+    "financialApplications": 283000.0,
+    "revenueInMonth": 283.0,
+    "suitability": "MODERADO"
+  }
+]

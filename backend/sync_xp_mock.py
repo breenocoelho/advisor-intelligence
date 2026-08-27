@@ -72,6 +72,11 @@ def upsert_client(db, org: Organization, account_data: dict) -> Client:
         ),
         qualified_investor=account_data.get("qualifiedInvestorTerm"),
         professional_investor=account_data.get("professionalTerm"),
+        person_type=account_data.get("personType"),
+        income_value=account_data.get("incomeValue"),
+        registration_updated_at=(
+            datetime.fromisoformat(account_data["lastUpdate"]) if account_data.get("lastUpdate") else None
+        ),
         last_synced_at=datetime.utcnow(),
     )
 
@@ -143,6 +148,11 @@ def upsert_asset(db, item: dict, asset_class: str) -> Asset:
         due_date=parse_date(item.get("dueDate")),
         index_description=item.get("indexDsc") or None,
         rate=item.get("rate"),
+        manager_name=item.get("fundManager"),
+        payment_frequency=item.get("paymentFrequency"),
+        liquidity_days=item.get("liquidityDays"),
+        minimum_investment=item.get("minimumInvestment"),
+        risk_rating=item.get("riskRating"),
     )
 
     if existing:

@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1026,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 15844.0,
+    "financialApplications": 1584400.0,
+    "revenueInMonth": 1584.4,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1026,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 16776.0,
+    "financialApplications": 1677600.0,
+    "revenueInMonth": 1677.6,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1026,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 17708.0,
+    "financialApplications": 1770800.0,
+    "revenueInMonth": 1770.8,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1026,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 18640.0,
+    "financialApplications": 1864000.0,
+    "revenueInMonth": 1864.0,
+    "suitability": "MODERADO"
+  }
+]

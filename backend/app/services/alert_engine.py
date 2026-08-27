@@ -4,13 +4,15 @@ banco fica isolada em run_alert_engine(). Thresholds vem do modulo
 central app.services.intelligence.thresholds (permite override por
 perfil de suitability sem mudar este arquivo).
 """
+import uuid
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.models import Client, Asset, Alert, Position
+from app.models import Client, Asset, Alert, Position, ClientInteraction, Task
 from app.services.intelligence.position_queries import latest_positions_query
 from app.services.intelligence.thresholds import get_threshold
+from app.services.intelligence.relationship_score import get_contact_cadence_days
 
 
 @dataclass
@@ -18,6 +20,7 @@ class Finding:
     alert_type: str
     severity: str
     explanation: str
+    asset_id: uuid.UUID | None = None  # so preenchido quando o alerta e' sobre UM ativo especifico
 
 
 def rule_idle_cash(db, client: Client) -> list[Finding]:
@@ -82,6 +85,7 @@ def rule_concentration(db, client: Client) -> list[Finding]:
                     f"{pct * 100:.1f}% do patrimonio (R$ {position.market_value:,.2f} "
                     f"de R$ {client.aum:,.2f}). Threshold: {threshold * 100:.0f}%."
                 ),
+                asset_id=asset.id,
             ))
     return findings
 
@@ -118,6 +122,7 @@ def rule_upcoming_maturity(db, client: Client, today: date | None = None) -> lis
                 f"({asset.due_date.isoformat()}), valor atual R$ {position.market_value:,.2f}. "
                 f"Recomenda-se contato para definir realocacao antes do resgate cair em conta."
             ),
+            asset_id=asset.id,
         ))
     return findings
 
@@ -163,9 +168,12 @@ def rule_relevant_movement(db, client: Client) -> list[Finding]:
 
 def rule_no_recent_contact(db, client: Client, today: date | None = None) -> list[Finding]:
     """Usa Client.last_contact_at, alimentado pelo botao "Registrar contato"
-    no Client 360 (ou pelo backfill a partir do mock de CRM)."""
+    no Client 360 (ou pelo backfill a partir do mock de CRM). O threshold
+    de dias nao e' mais fixo -- vem da cadencia de contato por tier do
+    cliente (Relationship Intelligence, Etapa 3), configuravel por org."""
     today = today or date.today()
-    days_threshold = int(get_threshold(db, "no_contact_days", client.org_id, client))
+    has_interaction = db.query(ClientInteraction).filter(ClientInteraction.client_id == client.id).first() is not None
+    days_threshold = int(get_contact_cadence_days(db, client.org_id, client, has_any_interaction=has_interaction))
 
     if client.last_contact_at is None:
         return [Finding(
@@ -182,10 +190,36 @@ def rule_no_recent_contact(db, client: Client, today: date | None = None) -> lis
             explanation=(
                 f"Sem contato registrado ha {days_since_contact} dias "
                 f"(ultimo em {client.last_contact_at.date().isoformat()}). "
-                f"Threshold: {days_threshold} dias."
+                f"Cadencia esperada para este cliente: {days_threshold} dias."
             ),
         )]
     return []
+
+
+def rule_followup_overdue(db, client: Client, today: date | None = None) -> list[Finding]:
+    """Tarefas pendentes com prazo vencido -- 'Follow-up atrasado' da
+    Relationship Intelligence (Etapa 3)."""
+    today = today or date.today()
+
+    overdue_tasks = (
+        db.query(Task)
+        .filter(Task.client_id == client.id, Task.status == "pending", Task.due_date.isnot(None), Task.due_date < today)
+        .all()
+    )
+
+    findings = []
+    for task in overdue_tasks:
+        days_overdue = (today - task.due_date).days
+        findings.append(Finding(
+            alert_type="followup_overdue",
+            severity="follow_up",
+            explanation=(
+                f"Follow-up atrasado ha {days_overdue} dia(s) (prazo era {task.due_date.isoformat()}): "
+                f"\"{task.description}\"."
+            ),
+            asset_id=task.asset_id,
+        ))
+    return findings
 
 
 ALL_RULES = [
@@ -194,29 +228,63 @@ ALL_RULES = [
     rule_upcoming_maturity,
     rule_relevant_movement,
     rule_no_recent_contact,
+    rule_followup_overdue,
 ]
 
 
 def run_alert_engine(db) -> int:
+    """Cada run faz upsert dos alertas 'new' do cliente por chave
+    (alert_type, asset_id), em vez de apagar e recriar tudo -- assim
+    'created_at' passa a significar "quando o alerta foi identificado pela
+    primeira vez" mesmo que a explicacao/severidade mude de um run pro
+    outro (ex: % de concentracao subindo dia a dia). Um alerta 'new' com
+    uma Task apontando pra ele (via "Lembrar depois") nunca e' apagado --
+    a FK de Task.alert_id quebraria -- mas continua sendo atualizado
+    normalmente se a condicao que o gerou ainda for verdadeira."""
     clients = db.query(Client).all()
     total_created = 0
 
     for client in clients:
-        db.query(Alert).filter(Alert.client_id == client.id, Alert.status == "new").delete()
+        protected_ids = {
+            row[0] for row in
+            db.query(Task.alert_id).filter(Task.client_id == client.id, Task.alert_id.isnot(None)).all()
+        }
+
+        existing_alerts = (
+            db.query(Alert)
+            .filter(Alert.client_id == client.id, Alert.status == "new")
+            .all()
+        )
+        existing_by_key = {(a.alert_type, a.asset_id): a for a in existing_alerts}
 
         findings: list[Finding] = []
         for rule in ALL_RULES:
             findings.extend(rule(db, client))
 
+        matched_keys = set()
         for finding in findings:
-            db.add(Alert(
-                client_id=client.id,
-                alert_type=finding.alert_type,
-                severity=finding.severity,
-                explanation=finding.explanation,
-                status="new",
-            ))
-            total_created += 1
+            key = (finding.alert_type, finding.asset_id)
+            matched_keys.add(key)
+            existing = existing_by_key.get(key)
+            if existing is not None:
+                existing.severity = finding.severity
+                existing.explanation = finding.explanation
+            else:
+                db.add(Alert(
+                    client_id=client.id,
+                    asset_id=finding.asset_id,
+                    alert_type=finding.alert_type,
+                    severity=finding.severity,
+                    explanation=finding.explanation,
+                    status="new",
+                ))
+                total_created += 1
+
+        # condicao deixou de valer nesse run -- remove, exceto se protegido por uma task
+        for key, alert in existing_by_key.items():
+            if key in matched_keys or alert.id in protected_ids:
+                continue
+            db.delete(alert)
 
         db.commit()
 

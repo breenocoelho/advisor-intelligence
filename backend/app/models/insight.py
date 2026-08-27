@@ -18,5 +18,6 @@ class Insight(Base):
     explanation = Column(Text, nullable=True)
     evidence = Column(JSONB, nullable=True)  # JSON estruturado, nunca gerado por LLM
     status = Column(String, nullable=False, default="new")  # new | viewed | dismissed | actioned
+    resolution_note = Column(Text, nullable=True)  # por que foi acionado/descartado
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

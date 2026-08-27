@@ -19,7 +19,10 @@ class Client(Base):
     declared_wealth_total = Column(Numeric, nullable=True)
     qualified_investor = Column(String, nullable=True)
     professional_investor = Column(String, nullable=True)
+    person_type = Column(String, nullable=True)  # "F" pessoa fisica | "J" pessoa juridica
+    income_value = Column(Numeric, nullable=True)  # renda declarada
+    registration_updated_at = Column(DateTime, nullable=True)  # ultima atualizacao do cadastro NA XP (campo "lastUpdate")
 
     aum = Column(Numeric, default=0)
-    last_synced_at = Column(DateTime, nullable=True)
+    last_synced_at = Column(DateTime, nullable=True)  # quando NOSSO sync rodou por ultimo
     last_contact_at = Column(DateTime, nullable=True)  # registrado via botao no Client 360

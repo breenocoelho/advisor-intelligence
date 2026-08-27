@@ -8,6 +8,7 @@ from app.models import ThresholdRule
 from app.schemas import ThresholdRuleOut, ThresholdRuleIn
 from app.routers.clients import resolve_org_id
 from app.services.intelligence.thresholds import DEFAULT_THRESHOLDS
+from app.services.audit import log_action
 
 router = APIRouter()
 
@@ -62,6 +63,8 @@ def upsert_threshold_rule(
 
     rule.value = payload.value
     rule.updated_by = current_user.get("user_id")
+    scope = f"perfil {payload.suitability_profile}" if payload.suitability_profile else "organização"
+    log_action(db, org_id, "threshold_rule_saved", f"Threshold '{payload.signal_key}' ({scope}) definido como {payload.value}")
     db.commit()
     db.refresh(rule)
     return rule
@@ -81,5 +84,6 @@ def delete_threshold_rule(
     )
     if rule is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Regra não encontrada")
+    log_action(db, org_id, "threshold_rule_deleted", f"Threshold '{rule.signal_key}' removido, volta ao default")
     db.delete(rule)
     db.commit()

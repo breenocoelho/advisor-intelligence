@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import clients, alerts, tasks, insights, threshold_rules
+from app.routers import (
+    clients, alerts, tasks, insights, threshold_rules, assets, advisors, interactions, benchmarks, config,
+)
 
 app = FastAPI(title="Advisor Intelligence API")
 
@@ -16,6 +18,11 @@ app.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])
 app.include_router(threshold_rules.router, prefix="/threshold-rules", tags=["threshold-rules"])
+app.include_router(assets.router, prefix="/assets", tags=["assets"])
+app.include_router(advisors.router, prefix="/advisors", tags=["advisors"])
+app.include_router(interactions.router, prefix="/clients", tags=["interactions"])
+app.include_router(benchmarks.router, prefix="/benchmarks", tags=["benchmarks"])
+app.include_router(config.router, prefix="/config", tags=["config"])
 
 
 @app.get("/health")

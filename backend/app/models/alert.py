@@ -10,8 +10,10 @@ class Alert(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.id"), nullable=True)  # so quando o alerta e' sobre UM ativo especifico
     alert_type = Column(String, nullable=False)
     severity = Column(String, nullable=False)
     explanation = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="new")
+    resolution_note = Column(Text, nullable=True)  # por que foi acionado/descartado
     created_at = Column(DateTime(timezone=True), server_default=func.now())

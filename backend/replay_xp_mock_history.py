@@ -18,7 +18,7 @@ from decimal import Decimal
 from app.database import SessionLocal
 from app.models import (
     Client, Account, Asset, Position, ClientAdvisorHistory,
-    ClientDailySnapshot, PositivadorSnapshot,
+    ClientDailySnapshot, PositivadorSnapshot, AdvisorDailySnapshot,
 )
 from app.integrations.xp.mock_client import XPMockClient
 from app.services.intelligence.health_score import compute_health_score
@@ -140,6 +140,41 @@ def sync_positivador_snapshot(db, client_row: Client, xp_code: int, snapshot_dat
     db.commit()
 
 
+def compute_advisor_snapshots(db, org, snapshot_date: date):
+    """Agrega client_daily_snapshot por assessor (vinculo vigente em
+    ClientAdvisorHistory) numa data -- advisor_daily_snapshot
+    (Historical Foundation, Etapa 1)."""
+    rows = (
+        db.query(ClientAdvisorHistory.advisor_id, ClientDailySnapshot)
+        .join(ClientDailySnapshot, ClientDailySnapshot.client_id == ClientAdvisorHistory.client_id)
+        .filter(ClientAdvisorHistory.valid_to.is_(None), ClientDailySnapshot.snapshot_date == snapshot_date)
+        .all()
+    )
+
+    by_advisor: dict = {}
+    for advisor_id, snapshot in rows:
+        bucket = by_advisor.setdefault(advisor_id, {"aum": Decimal(0), "client_count": 0, "net_flow": Decimal(0)})
+        bucket["aum"] += Decimal(snapshot.aum or 0)
+        bucket["client_count"] += 1
+        bucket["net_flow"] += Decimal(snapshot.monthly_purchase_value or 0) - Decimal(snapshot.monthly_sale_value or 0)
+
+    for advisor_id, agg in by_advisor.items():
+        existing = (
+            db.query(AdvisorDailySnapshot)
+            .filter(AdvisorDailySnapshot.advisor_id == advisor_id, AdvisorDailySnapshot.snapshot_date == snapshot_date)
+            .first()
+        )
+        fields = dict(aum=agg["aum"], client_count=agg["client_count"], net_flow=agg["net_flow"])
+        if existing:
+            for k, v in fields.items():
+                setattr(existing, k, v)
+        else:
+            db.add(AdvisorDailySnapshot(
+                id=uuid.uuid4(), org_id=org.id, advisor_id=advisor_id, snapshot_date=snapshot_date, **fields,
+            ))
+    db.commit()
+
+
 def main():
     db = SessionLocal()
     try:
@@ -172,6 +207,8 @@ def main():
 
                 compute_daily_snapshot(db, org, client_row, snapshot_date)
                 sync_positivador_snapshot(db, client_row, code, snapshot_date)
+
+            compute_advisor_snapshots(db, org, snapshot_date)
 
         print("Replay concluido.")
     finally:

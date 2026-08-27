@@ -6,8 +6,9 @@ import { UserButton } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
   { href: "/", label: "Today" },
-  { href: "/insights", label: "Insights" },
   { href: "/clientes", label: "Clientes" },
+  { href: "/ativos", label: "Ativos" },
+  { href: "/assessores", label: "Assessores" },
   { href: "/tarefas", label: "Tarefas" },
   { href: "/alertas", label: "Histórico" },
   { href: "/config/thresholds", label: "Config" },
@@ -18,7 +19,7 @@ export default function NavBar() {
 
   return (
     <nav className="border-b border-[#14181F]/10 bg-white">
-      <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-6">
           <span className="font-display text-sm font-semibold tracking-tight">
             Advisor Intelligence

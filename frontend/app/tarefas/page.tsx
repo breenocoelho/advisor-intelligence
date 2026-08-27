@@ -54,15 +54,20 @@ export default async function TarefasPage() {
             {pending.map((task) => (
               <div
                 key={task.id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-[#14181F]/10 bg-white p-3"
-                style={{
-                  borderLeft: `3px solid ${task.severity ? SEVERITY_ACCENT[task.severity] : "#14181F33"}`,
-                }}
+                className="flex items-start justify-between gap-4 card p-3"
               >
                 <div className="min-w-0">
-                  <Link href={`/clientes/${task.client_id}`} className="text-sm font-medium hover:underline">
-                    {task.client_name ?? "Cliente"}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: task.severity ? SEVERITY_ACCENT[task.severity] : "#14181F33",
+                      }}
+                    />
+                    <Link href={`/clientes/${task.client_id}`} className="text-sm font-medium hover:underline">
+                      {task.client_name ?? "Cliente"}
+                    </Link>
+                  </div>
                   <p className="mt-1 text-sm text-[#14181F]/70">{task.description}</p>
                   {task.due_date && (
                     <p className="mt-1 font-mono text-xs tabular-nums text-[#14181F]/40">
@@ -86,7 +91,7 @@ export default async function TarefasPage() {
             {done.map((task) => (
               <div
                 key={task.id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-[#14181F]/10 bg-white p-3 opacity-60"
+                className="flex items-start justify-between gap-4 card p-3 opacity-60"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{task.client_name ?? "Cliente"}</p>

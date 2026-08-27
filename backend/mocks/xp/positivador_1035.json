@@ -1,0 +1,46 @@
+[
+  {
+    "accountCode": 1035,
+    "referenceDate": "2026-05-28",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 28849.0,
+    "financialApplications": 2884900.0,
+    "revenueInMonth": 2884.9,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1035,
+    "referenceDate": "2026-06-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 30546.0,
+    "financialApplications": 3054600.0,
+    "revenueInMonth": 3054.6,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1035,
+    "referenceDate": "2026-07-27",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 32243.0,
+    "financialApplications": 3224300.0,
+    "revenueInMonth": 3224.3,
+    "suitability": "MODERADO"
+  },
+  {
+    "accountCode": 1035,
+    "referenceDate": "2026-08-26",
+    "status": "ATIVO",
+    "activatedInMonth": null,
+    "churnedInMonth": null,
+    "netCaptureInMonth": 33940.0,
+    "financialApplications": 3394000.0,
+    "revenueInMonth": 3394.0,
+    "suitability": "MODERADO"
+  }
+]
