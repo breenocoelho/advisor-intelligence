@@ -5,7 +5,7 @@
     {
       "clientId": 1002,
       "advisorCode": "AX0001",
-      "assetId": "90733021-46ea-497a-abda-af2edc9f2faa",
+      "assetId": "bd870a9b-5882-4fc9-bf7e-eae4a573856f",
       "asset": "CDB BANCO ABC 118% CDI",
       "marketType": "CDB",
       "dueDate": null,
@@ -63,7 +63,7 @@
     {
       "clientId": 1002,
       "advisorCode": "AX0001",
-      "assetId": "0a1597eb-2b4a-4f8c-b059-47cf71f64a74",
+      "assetId": "4cf9fe2b-3532-4848-80ae-236475c64e61",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,

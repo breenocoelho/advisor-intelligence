@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ContactButton from "./ContactButton";
+import PositionsComparison from "./PositionsComparison";
 
 type Position = {
   id: string;
@@ -34,6 +35,21 @@ type Task = {
   status: string;
 };
 
+type Insight = {
+  id: string;
+  insight_type: string;
+  severity: "critical" | "opportunity" | "follow_up";
+  title: string;
+  explanation: string | null;
+  status: string;
+};
+
+type SnapshotPoint = {
+  snapshot_date: string;
+  aum: number | null;
+  health_score: number | null;
+};
+
 type ClientDetail = {
   id: string;
   xp_client_id: string | null;
@@ -53,6 +69,9 @@ type ClientDetail = {
   positions: Position[];
   alerts: Alert[];
   tasks: Task[];
+  insights: Insight[];
+  health_score: number | null;
+  aum_trend: SnapshotPoint[];
 };
 
 const SEVERITY_CONFIG = {
@@ -67,6 +86,10 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   upcoming_maturity: "Vencimento próximo",
   relevant_movement: "Movimentação relevante",
   no_recent_contact: "Sem contato recente",
+};
+
+const INSIGHT_TYPE_LABELS: Record<string, string> = {
+  concentration_by_issuer: "Concentração por emissor",
 };
 
 const ASSET_CLASS_LABELS: Record<string, string> = {
@@ -105,6 +128,19 @@ async function getClient(id: string): Promise<ClientDetail | null> {
   return res.json();
 }
 
+async function getPositionDates(id: string): Promise<string[]> {
+  const { getToken } = await auth();
+  const token = await getToken();
+
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clients/${id}/position-dates`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+
+  if (!res.ok) return [];
+  return res.json();
+}
+
 function formatCurrency(value: number | null): string {
   if (value === null) return "—";
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -120,6 +156,13 @@ function formatBirth(year: number | null, month: number | null): string {
   return month ? `${String(month).padStart(2, "0")}/${year}` : `${year}`;
 }
 
+function healthScoreColor(score: number | null): string {
+  if (score === null) return "#14181F66";
+  if (score >= 80) return "#3F7D5B";
+  if (score >= 60) return "#A6790A";
+  return "#B23A48";
+}
+
 function formatLastContact(value: string | null): string {
   if (!value) return "nunca registrado";
   const days = Math.floor((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60 * 24));
@@ -133,6 +176,8 @@ export default async function Client360Page({ params }: { params: Promise<{ id: 
   const client = await getClient(id);
 
   if (!client) notFound();
+
+  const positionDates = await getPositionDates(id);
 
   const totalPositions = client.positions.reduce((sum, p) => sum + p.market_value, 0);
   const totalInflow = client.positions.reduce((sum, p) => sum + p.period_purchase_value, 0);
@@ -163,6 +208,18 @@ export default async function Client360Page({ params }: { params: Promise<{ id: 
         <div className="text-right">
           <p className="font-mono text-2xl font-semibold tabular-nums">{formatCurrency(client.aum)}</p>
           <p className="text-sm text-[#14181F]/50">patrimônio (AUM)</p>
+          {client.health_score !== null && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#14181F]/5 px-2.5 py-1">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: healthScoreColor(client.health_score) }}
+              />
+              <span className="font-mono text-xs font-semibold tabular-nums">
+                {client.health_score}
+              </span>
+              <span className="text-xs text-[#14181F]/50">health score</span>
+            </p>
+          )}
         </div>
       </header>
 
@@ -222,6 +279,47 @@ export default async function Client360Page({ params }: { params: Promise<{ id: 
         </section>
       )}
 
+      {/* Tendencia (client_daily_snapshot) */}
+      {client.aum_trend.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+            Tendência
+          </h2>
+          <div className="overflow-hidden rounded-lg border border-[#14181F]/10 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#14181F]/10 text-left text-xs uppercase tracking-wide text-[#14181F]/40">
+                  <th className="px-4 py-3 font-medium">Data</th>
+                  <th className="px-4 py-3 text-right font-medium">AUM</th>
+                  <th className="px-4 py-3 text-right font-medium">Health score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {client.aum_trend.map((point) => (
+                  <tr key={point.snapshot_date} className="border-b border-[#14181F]/5 last:border-0">
+                    <td className="px-4 py-3 font-mono text-[#14181F]/70">
+                      {new Date(point.snapshot_date).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums">
+                      {formatCurrency(point.aum)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums">
+                      {point.health_score !== null ? (
+                        <span style={{ color: healthScoreColor(point.health_score) }}>
+                          {point.health_score}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* Alertas */}
       <section className="mb-10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
@@ -249,6 +347,42 @@ export default async function Client360Page({ params }: { params: Promise<{ id: 
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-[#14181F]/70">{alert.explanation}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Insights */}
+      <section className="mb-10">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+          Insights ({client.insights.length})
+        </h2>
+        {client.insights.length === 0 ? (
+          <p className="text-sm text-[#14181F]/50">Nenhum insight registrado para este cliente.</p>
+        ) : (
+          <div className="space-y-2">
+            {client.insights.map((insight) => {
+              const config = SEVERITY_CONFIG[insight.severity];
+              return (
+                <div
+                  key={insight.id}
+                  className="flex items-start justify-between gap-4 rounded-lg border border-[#14181F]/10 bg-white p-3"
+                  style={{ borderLeft: `3px solid ${config.accent}` }}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-[#14181F]/40">
+                        {INSIGHT_TYPE_LABELS[insight.insight_type] ?? insight.insight_type}
+                      </span>
+                      <span className="text-xs text-[#14181F]/30">
+                        {STATUS_LABELS[insight.status] ?? insight.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm font-medium">{insight.title}</p>
+                    <p className="mt-1 text-sm text-[#14181F]/70">{insight.explanation}</p>
                   </div>
                 </div>
               );
@@ -288,10 +422,13 @@ export default async function Client360Page({ params }: { params: Promise<{ id: 
         )}
       </section>
 
-      {/* Posições */}
+      {/* Comparacao de posicoes entre datas */}
+      <PositionsComparison clientId={client.id} availableDates={positionDates} />
+
+      {/* Posições (data mais recente) */}
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
-          Posições ({client.positions.length})
+          Posições atuais ({client.positions.length})
         </h2>
         {client.positions.length === 0 ? (
           <p className="text-sm text-[#14181F]/50">Nenhuma posição sincronizada.</p>

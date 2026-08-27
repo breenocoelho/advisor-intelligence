@@ -6,9 +6,11 @@ import { UserButton } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
   { href: "/", label: "Today" },
+  { href: "/insights", label: "Insights" },
   { href: "/clientes", label: "Clientes" },
   { href: "/tarefas", label: "Tarefas" },
   { href: "/alertas", label: "Histórico" },
+  { href: "/config/thresholds", label: "Config" },
 ];
 
 export default function NavBar() {
@@ -41,7 +43,7 @@ export default function NavBar() {
             })}
           </div>
         </div>
-        <UserButton afterSignOutUrl="/" />
+        <UserButton />
       </div>
     </nav>
   );

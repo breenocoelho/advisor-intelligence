@@ -5,7 +5,7 @@
     {
       "clientId": 1010,
       "advisorCode": "AX0001",
-      "assetId": "2d4f1902-ba25-43de-b9ce-ef003c61e9b6",
+      "assetId": "9bb2dde2-256e-464f-bccf-63516ed65eb4",
       "asset": "CDB BANCO ABC 118% CDI",
       "marketType": "CDB",
       "dueDate": null,
@@ -16,7 +16,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 196000.0,
-      "closingValue": 200000.0,
+      "closingValue": 200000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -58,12 +58,12 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 200000.0
+      "closingNetValue": 200000
     },
     {
       "clientId": 1010,
       "advisorCode": "AX0001",
-      "assetId": "b0723eff-f4d1-4854-8e40-0d02dff81a1c",
+      "assetId": "6f7474ca-0985-4492-9d4d-3094b02a13b5",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -74,7 +74,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 147000.0,
-      "closingValue": 150000.0,
+      "closingValue": 150000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -116,7 +116,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 150000.0
+      "closingNetValue": 150000
     }
   ],
   "checkingAccount": [
@@ -124,8 +124,8 @@
       "clientId": 1010,
       "advisorCode": "AX0001",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 60000.0,
-      "closingValue": 60000.0
+      "openingValue": 60000,
+      "closingValue": 60000
     }
   ],
   "pensionFunds": [],
@@ -135,7 +135,7 @@
     {
       "clientId": 1010,
       "advisorCode": "AX0001",
-      "assetId": "ee88cebf-04c5-49ba-8c6c-012f61b5e7df",
+      "assetId": "8f4e2ad5-0094-4903-a7d3-4ea7e0865d37",
       "asset": "PETR4",
       "isin": "BRPETRACNOR9",
       "marketType": "AÇÃO",
@@ -143,11 +143,11 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-27T00:00:00",
       "openingValue": 87300.0,
-      "closingValue": 90000.0,
+      "closingValue": 90000,
       "delta": 0.0,
       "status": 4,
-      "openingQuantity": 1000.0,
-      "closingQuantity": 1000.0,
+      "openingQuantity": 1000,
+      "closingQuantity": 1000,
       "blockingQuantity": 0.0,
       "collateralQuantity": 0.0,
       "lawBlockingQuantity": 0.0,
@@ -185,7 +185,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 90000.0,
+      "closingNetValue": 90000,
       "remuneratedCustodyOpeningQuantity": 0.0,
       "remuneratedCustodyClosingQuantity": 0.0,
       "remuneratedCustodyOpeningValue": 0.0,
@@ -196,7 +196,7 @@
     {
       "clientId": 1010,
       "advisorCode": "AX0001",
-      "assetId": "816f9b6c-7713-4521-a16a-9ba3264a22e3",
+      "assetId": "53b95f23-3b23-46c7-bf60-c4de33a31b0d",
       "asset": "XPFI11",
       "isin": "BRXPFICTF000",
       "marketType": "FII",
@@ -204,11 +204,11 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2025-12-19T00:00:00",
       "openingValue": 49500.0,
-      "closingValue": 50000.0,
+      "closingValue": 50000,
       "delta": 0.0,
       "status": 4,
-      "openingQuantity": 6200.0,
-      "closingQuantity": 6200.0,
+      "openingQuantity": 6200,
+      "closingQuantity": 6200,
       "blockingQuantity": 0.0,
       "collateralQuantity": 0.0,
       "lawBlockingQuantity": 0.0,
@@ -246,7 +246,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 50000.0
+      "closingNetValue": 50000
     }
   ]
 }

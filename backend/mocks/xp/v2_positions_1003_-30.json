@@ -5,7 +5,7 @@
     {
       "clientId": 1003,
       "advisorCode": "AX0001",
-      "assetId": "1d7dfd65-b9d6-45a8-8645-91694e7e8ff5",
+      "assetId": "98432139-c75a-4a29-bfa2-cf7c01a6940e",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -77,7 +77,7 @@
     {
       "clientId": 1003,
       "advisorCode": "AX0001",
-      "assetId": "4416f7c4-1fc6-4f10-a4b7-d2467ece9999",
+      "assetId": "204fdbeb-0246-4ab5-991a-722b4bb0d09b",
       "asset": "PETR4",
       "isin": "BRPETRACNOR9",
       "marketType": "AÇÃO",

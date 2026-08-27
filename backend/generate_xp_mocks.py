@@ -39,25 +39,72 @@ def scale_factor(offset_days: int) -> float:
 
 
 _POSITION_VALUE_FIELDS = [
-    "openingValue", "closingValue", "purchaseValue", "saleValue",
+    "openingValue", "closingValue",
     "custodyTransferInAmount", "custodyTransferOutAmount",
     "unitInterest", "totalInterest", "profitAndLoss", "closingNetValue",
     "openingQuantity", "closingQuantity", "amount",
 ]
+# purchaseValue/saleValue sao fluxos do periodo, nao tratados por
+# _POSITION_VALUE_FIELDS -- ver build_scenario_snapshot() abaixo.
 
 
-def scale_position_payload(payload: dict, factor: float) -> dict:
-    """Escala proporcionalmente os campos monetarios/quantidade de um
-    payload de /v2/positions/customers/{code} (todas as classes de ativo).
-    Datas e campos de identidade (asset, issuer, dueDate, rate, indexDsc,
-    isin) ficam inalterados -- so o tamanho da posicao muda com o tempo."""
-    scaled = copy.deepcopy(payload)
-    for asset_class_items in scaled.values():
-        for item in asset_class_items:
+def build_scenario_snapshot(payload: dict, offset_days: int) -> dict:
+    """Aplica a dimensao temporal a um payload 'de hoje' (offset 0).
+
+    A maioria das posicoes nao tem fluxo no periodo (purchaseValue e
+    saleValue = 0) e so recebe um ramp organico linear pelo tempo.
+
+    Posicoes que TEM fluxo hoje sao tratadas como um evento pontual que
+    aconteceu entre a penultima data mockada e hoje -- nao um fluxo que se
+    repete identico em toda data historica (bug corrigido: antes o
+    saleValue/purchaseValue era escalado do mesmo jeito que o
+    closingValue, entao um "resgate" aparecia, proporcionalmente menor,
+    em toda data do passado, e o AUM historico crescia junto com o
+    resgate em vez de cair quando ele acontece):
+      - resgate (saleValue > 0, sem compra): nas datas anteriores ao
+        evento, a posicao ainda tem o valor de antes do resgate
+        (closingValue atual + saleValue), sem fluxo registrado; o
+        resgate em si so aparece na data mais recente.
+      - posicao nova comprada com o fluxo do periodo (purchaseValue > 0,
+        sem venda): simplesmente nao existe ainda nas datas anteriores.
+    """
+    if offset_days == 0:
+        return copy.deepcopy(payload)
+
+    factor = scale_factor(offset_days)
+    snapshot: dict[str, list] = {k: [] for k in payload}
+
+    for asset_class, items in payload.items():
+        for item in items:
+            sale = item.get("saleValue") or 0
+            purchase = item.get("purchaseValue") or 0
+
+            if purchase > 0 and sale == 0:
+                # comprada com o fluxo do periodo -- ainda nao existia
+                continue
+
+            new_item = copy.deepcopy(item)
+
+            if sale > 0 and purchase == 0:
+                # resgatada no periodo -- estado pre-resgate, escalado
+                pre_event_value = (item.get("closingValue") or 0) + sale
+                scaled_value = round(pre_event_value * factor, 2)
+                base_value = item.get("closingValue") or 0
+                ratio = (scaled_value / base_value) if base_value else 1.0
+                new_item["closingValue"] = scaled_value
+                new_item["closingQuantity"] = round((item.get("closingQuantity") or 0) * ratio, 4)
+                new_item["purchaseValue"] = 0.0
+                new_item["saleValue"] = 0.0
+                snapshot[asset_class].append(new_item)
+                continue
+
+            # sem fluxo no periodo -- ramp organico simples
             for field in _POSITION_VALUE_FIELDS:
-                if field in item and isinstance(item[field], (int, float)) and item[field]:
-                    item[field] = round(item[field] * factor, 2)
-    return scaled
+                if field in new_item and isinstance(new_item[field], (int, float)) and new_item[field]:
+                    new_item[field] = round(new_item[field] * factor, 2)
+            snapshot[asset_class].append(new_item)
+
+    return snapshot
 
 
 def iso(dt: datetime | None) -> str | None:
@@ -468,8 +515,8 @@ def main():
         # nome sem sufixo mantido para compat com sync_xp_mock.py (fluxo "hoje")
         write_json(MOCKS_DIR / f"v2_positions_{code}.json", payload)
         for offset in SNAPSHOT_OFFSETS_DAYS:
-            scaled = scale_position_payload(payload, scale_factor(offset))
-            write_json(MOCKS_DIR / f"v2_positions_{code}_{offset}.json", scaled)
+            snapshot = build_scenario_snapshot(payload, offset)
+            write_json(MOCKS_DIR / f"v2_positions_{code}_{offset}.json", snapshot)
 
     investment_balances = build_investment_balances()
     for code, payload in investment_balances.items():

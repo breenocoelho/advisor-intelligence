@@ -5,7 +5,7 @@
     {
       "clientId": 1009,
       "advisorCode": "AX0003",
-      "assetId": "6fa0beb7-ce6f-4a6e-a2d7-e649ec580cfc",
+      "assetId": "50ed98ba-4be7-4ffc-8b0b-4ba574488425",
       "asset": "CDB BANCO ABC 118% CDI",
       "marketType": "CDB",
       "dueDate": null,
@@ -16,7 +16,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 254800.0,
-      "closingValue": 260000.0,
+      "closingValue": 260000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -58,7 +58,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 260000.0
+      "closingNetValue": 260000
     }
   ],
   "checkingAccount": [
@@ -66,8 +66,8 @@
       "clientId": 1009,
       "advisorCode": "AX0003",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 40000.0,
-      "closingValue": 40000.0
+      "openingValue": 40000,
+      "closingValue": 40000
     }
   ],
   "pensionFunds": [],

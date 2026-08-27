@@ -5,7 +5,7 @@
     {
       "clientId": 1001,
       "advisorCode": "AX0001",
-      "assetId": "0791da21-3d76-408c-885f-027f6e1d4c03",
+      "assetId": "23f2a84f-e05e-4592-9835-3bc579e4beb8",
       "asset": "DEBENTURE XYZ PREFIXADA 14%",
       "marketType": "DEBENTURE",
       "dueDate": null,
@@ -16,7 +16,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 480200.0,
-      "closingValue": 490000.0,
+      "closingValue": 490000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -58,12 +58,12 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 490000.0
+      "closingNetValue": 490000
     },
     {
       "clientId": 1001,
       "advisorCode": "AX0001",
-      "assetId": "98b4b1a3-efe8-4eb0-a4e6-b19a814ca3fe",
+      "assetId": "aabd8b2c-6ac2-4746-ac8a-c43f989fb5bc",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -74,7 +74,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 186200.0,
-      "closingValue": 190000.0,
+      "closingValue": 190000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -116,7 +116,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 190000.0
+      "closingNetValue": 190000
     }
   ],
   "checkingAccount": [
@@ -124,8 +124,8 @@
       "clientId": 1001,
       "advisorCode": "AX0001",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 20000.0,
-      "closingValue": 20000.0
+      "openingValue": 20000,
+      "closingValue": 20000
     }
   ],
   "pensionFunds": [],

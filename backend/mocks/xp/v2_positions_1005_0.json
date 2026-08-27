@@ -5,7 +5,7 @@
     {
       "clientId": 1005,
       "advisorCode": "AX0002",
-      "assetId": "c6e7f025-311c-4161-863c-71ab839bd352",
+      "assetId": "b0ee2ee2-c69c-453f-a69d-0004a8afba6c",
       "asset": "CDB BANCO ABC 118% CDI",
       "marketType": "CDB",
       "dueDate": "2026-09-05T00:00:00",
@@ -16,7 +16,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 156800.0,
-      "closingValue": 160000.0,
+      "closingValue": 160000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -58,12 +58,12 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 160000.0
+      "closingNetValue": 160000
     },
     {
       "clientId": 1005,
       "advisorCode": "AX0002",
-      "assetId": "01dcb58c-211b-43eb-ad43-06ea8259b6a7",
+      "assetId": "e65f15c9-259e-4ad6-afc9-bb416a23dd7d",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -74,7 +74,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 205800.0,
-      "closingValue": 210000.0,
+      "closingValue": 210000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -116,7 +116,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 210000.0
+      "closingNetValue": 210000
     }
   ],
   "checkingAccount": [
@@ -124,8 +124,8 @@
       "clientId": 1005,
       "advisorCode": "AX0002",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 30000.0,
-      "closingValue": 30000.0
+      "openingValue": 30000,
+      "closingValue": 30000
     }
   ],
   "pensionFunds": [],

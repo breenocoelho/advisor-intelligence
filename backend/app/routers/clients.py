@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from datetime import datetime, date
+from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -8,8 +8,11 @@ from app.auth import get_current_user
 from app.deps import get_db
 from app.models import (
     Client, Organization, Advisor, ClientAdvisorHistory, Alert, Asset, Position, Task,
+    Insight, ClientDailySnapshot, Account,
 )
-from app.schemas import ClientOut, ClientDetailOut, AlertOut, PositionOut, TaskOut
+from app.schemas import (
+    ClientOut, ClientDetailOut, AlertOut, PositionOut, TaskOut, InsightOut, SnapshotPointOut,
+)
 from app.services.intelligence.position_queries import latest_positions_query
 
 router = APIRouter()
@@ -29,6 +32,24 @@ def resolve_org_id(current_user: dict, db: Session) -> uuid.UUID | None:
         return uuid.UUID(org_id)
     fallback_org = db.query(Organization).first()
     return fallback_org.id if fallback_org else None
+
+
+def _build_position_out(position: Position, asset: Asset) -> PositionOut:
+    return PositionOut(
+        id=position.id,
+        asset_id=asset.id,
+        asset_name=asset.name,
+        asset_class=asset.asset_class,
+        market_value=float(position.market_value or 0),
+        quantity=float(position.quantity) if position.quantity is not None else None,
+        due_date=asset.due_date,
+        issuer=asset.issuer,
+        rate=float(asset.rate) if asset.rate is not None else None,
+        index_description=asset.index_description,
+        position_date=position.position_date,
+        period_purchase_value=float(position.period_purchase_value or 0),
+        period_sale_value=float(position.period_sale_value or 0),
+    )
 
 
 def get_current_advisor_name(db: Session, client_id) -> str | None:
@@ -141,23 +162,7 @@ def get_client_detail(
     item.active_alerts_count = active_alerts_count
     item.priority_score = priority_score
 
-    item.positions = [
-        PositionOut(
-            id=position.id,
-            asset_name=asset.name,
-            asset_class=asset.asset_class,
-            market_value=float(position.market_value or 0),
-            quantity=float(position.quantity) if position.quantity is not None else None,
-            due_date=asset.due_date,
-            issuer=asset.issuer,
-            rate=float(asset.rate) if asset.rate is not None else None,
-            index_description=asset.index_description,
-            position_date=position.position_date,
-            period_purchase_value=float(position.period_purchase_value or 0),
-            period_sale_value=float(position.period_sale_value or 0),
-        )
-        for position, asset in positions_rows
-    ]
+    item.positions = [_build_position_out(position, asset) for position, asset in positions_rows]
 
     item.alerts = []
     for alert in alerts_rows:
@@ -167,7 +172,84 @@ def get_client_detail(
 
     item.tasks = [TaskOut.model_validate(t) for t in tasks_rows]
 
+    insights_rows = (
+        db.query(Insight)
+        .filter(Insight.client_id == client_row.id)
+        .order_by(Insight.severity, Insight.created_at.desc())
+        .all()
+    )
+    item.insights = []
+    for insight in insights_rows:
+        insight_out = InsightOut.model_validate(insight)
+        insight_out.client_name = client_row.name
+        item.insights.append(insight_out)
+
+    snapshot_rows = (
+        db.query(ClientDailySnapshot)
+        .filter(ClientDailySnapshot.client_id == client_row.id)
+        .order_by(ClientDailySnapshot.snapshot_date)
+        .all()
+    )
+    item.aum_trend = [
+        SnapshotPointOut(
+            snapshot_date=s.snapshot_date,
+            aum=float(s.aum) if s.aum is not None else None,
+            health_score=s.health_score,
+        )
+        for s in snapshot_rows
+    ]
+    item.health_score = snapshot_rows[-1].health_score if snapshot_rows else None
+
     return item
+
+
+@router.get("/{client_id}/position-dates", response_model=list[date])
+def list_position_dates(
+    client_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Datas distintas com posicoes sincronizadas para o cliente (para
+    montar os seletores de comparacao na tela)."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    rows = (
+        db.query(Position.position_date)
+        .join(Account, Position.account_id == Account.id)
+        .filter(Account.client_id == client_row.id)
+        .distinct()
+        .order_by(Position.position_date)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.get("/{client_id}/positions-at", response_model=list[PositionOut])
+def get_positions_at(
+    client_id: str,
+    on_date: date = Query(..., alias="date"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Posicoes do cliente numa data especifica (nao necessariamente a mais
+    recente) -- base para a comparacao data x vs data y no Client 360."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    rows = (
+        db.query(Position, Asset)
+        .join(Asset, Position.asset_id == Asset.id)
+        .join(Account, Position.account_id == Account.id)
+        .filter(Account.client_id == client_row.id, Position.position_date == on_date)
+        .order_by(Position.market_value.desc())
+        .all()
+    )
+    return [_build_position_out(position, asset) for position, asset in rows]
 
 
 @router.post("/{client_id}/contact", response_model=ClientDetailOut)

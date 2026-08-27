@@ -5,7 +5,7 @@
     {
       "clientId": 1008,
       "advisorCode": "AX0003",
-      "assetId": "d29d0fbe-59e1-4533-96f9-5e0e939bb316",
+      "assetId": "f9bf9373-601a-4f8c-98ca-528fd9809d41",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -16,7 +16,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 313600.0,
-      "closingValue": 320000.0,
+      "closingValue": 320000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -31,7 +31,7 @@
       "custodyTransferInQuantity": 0.0,
       "custodyTransferOutQuantity": 0.0,
       "purchaseValue": 0.0,
-      "saleValue": 230000.0,
+      "saleValue": 230000,
       "custodyTransferInAmount": 0.0,
       "custodyTransferOutAmount": 0.0,
       "unitInterest": 0.0,
@@ -58,7 +58,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 320000.0
+      "closingNetValue": 320000
     }
   ],
   "checkingAccount": [
@@ -66,8 +66,8 @@
       "clientId": 1008,
       "advisorCode": "AX0003",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 30000.0,
-      "closingValue": 30000.0
+      "openingValue": 30000,
+      "closingValue": 30000
     }
   ],
   "pensionFunds": [],

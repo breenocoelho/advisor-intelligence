@@ -5,7 +5,7 @@
     {
       "clientId": 1007,
       "advisorCode": "AX0003",
-      "assetId": "f3b7e025-f030-4f6d-b3e2-f83d7d8bbeae",
+      "assetId": "64a71c3d-698f-4787-8d1d-6d4df97b5ebf",
       "asset": "CDB BANCO ABC 118% CDI",
       "marketType": "CDB",
       "dueDate": null,
@@ -31,7 +31,7 @@
       "custodyTransferInQuantity": 0.0,
       "custodyTransferOutQuantity": 0.0,
       "purchaseValue": 0.0,
-      "saleValue": 350000.0,
+      "saleValue": 350000,
       "custodyTransferInAmount": 0.0,
       "custodyTransferOutAmount": 0.0,
       "unitInterest": 0.0,
@@ -63,7 +63,7 @@
     {
       "clientId": 1007,
       "advisorCode": "AX0003",
-      "assetId": "107305e0-7fde-46ca-9781-3a88c7a5a9d7",
+      "assetId": "aa841f91-88ec-4e86-ba7e-4beaabd250c5",
       "asset": "TESOURO SELIC 2029",
       "marketType": "LFT",
       "dueDate": null,
@@ -74,7 +74,7 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-07T00:00:00",
       "openingValue": 205800.0,
-      "closingValue": 210000.0,
+      "closingValue": 210000,
       "delta": 0.0,
       "status": 1,
       "openingQuantity": 0.0,
@@ -116,7 +116,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 210000.0
+      "closingNetValue": 210000
     }
   ],
   "checkingAccount": [
@@ -124,8 +124,8 @@
       "clientId": 1007,
       "advisorCode": "AX0003",
       "effectiveDate": "2026-08-26T00:00:00",
-      "openingValue": 40000.0,
-      "closingValue": 40000.0
+      "openingValue": 40000,
+      "closingValue": 40000
     }
   ],
   "pensionFunds": [],
@@ -135,7 +135,7 @@
     {
       "clientId": 1007,
       "advisorCode": "AX0003",
-      "assetId": "e36f77bd-fe12-41ac-8145-9f2653fb6d15",
+      "assetId": "ec0de030-789a-4164-ad51-ef4c4d3e8191",
       "asset": "VALE3",
       "isin": "BRVALEACNOR0",
       "marketType": "AÇÃO",
@@ -143,11 +143,11 @@
       "effectiveDate": "2026-08-26T00:00:00",
       "purchaseDate": "2026-02-27T00:00:00",
       "openingValue": 339500.0,
-      "closingValue": 350000.0,
+      "closingValue": 350000,
       "delta": 0.0,
       "status": 4,
-      "openingQuantity": 5000.0,
-      "closingQuantity": 5000.0,
+      "openingQuantity": 5000,
+      "closingQuantity": 5000,
       "blockingQuantity": 0.0,
       "collateralQuantity": 0.0,
       "lawBlockingQuantity": 0.0,
@@ -157,7 +157,7 @@
       "saleQuantity": 0.0,
       "custodyTransferInQuantity": 0.0,
       "custodyTransferOutQuantity": 0.0,
-      "purchaseValue": 350000.0,
+      "purchaseValue": 350000,
       "saleValue": 0.0,
       "custodyTransferInAmount": 0.0,
       "custodyTransferOutAmount": 0.0,
@@ -185,7 +185,7 @@
       "incomeTax": 0.0,
       "iof": 0.0,
       "iofRate": 0.0,
-      "closingNetValue": 350000.0,
+      "closingNetValue": 350000,
       "remuneratedCustodyOpeningQuantity": 0.0,
       "remuneratedCustodyClosingQuantity": 0.0,
       "remuneratedCustodyOpeningValue": 0.0,

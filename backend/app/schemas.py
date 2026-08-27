@@ -33,6 +33,7 @@ class AlertOut(BaseModel):
 
 class PositionOut(BaseModel):
     id: UUID
+    asset_id: UUID
     asset_name: str
     asset_class: str
     market_value: float
@@ -87,6 +88,31 @@ class InsightOut(BaseModel):
     updated_at: datetime | None
 
 
+class ThresholdRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    signal_key: str
+    suitability_profile: str | None
+    value: float
+    updated_at: datetime | None
+    updated_by: str | None
+
+
+class ThresholdRuleIn(BaseModel):
+    signal_key: str
+    suitability_profile: str | None = None
+    value: float
+
+
+class SnapshotPointOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    snapshot_date: date
+    aum: float | None
+    health_score: int | None
+
+
 class ClientDetailOut(ClientOut):
     birth_year: int | None = None
     birth_month: int | None = None
@@ -98,3 +124,6 @@ class ClientDetailOut(ClientOut):
     positions: list[PositionOut] = []
     alerts: list[AlertOut] = []
     tasks: list[TaskOut] = []
+    insights: list[InsightOut] = []
+    health_score: int | None = None
+    aum_trend: list[SnapshotPointOut] = []
