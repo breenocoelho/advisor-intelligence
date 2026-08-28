@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/clientes", label: "Clientes" },
   { href: "/ativos", label: "Ativos" },
   { href: "/assessores", label: "Assessores" },
+  { href: "/oportunidades", label: "Oportunidades" },
   { href: "/tarefas", label: "Tarefas" },
   { href: "/alertas", label: "Histórico" },
   { href: "/config/thresholds", label: "Config" },

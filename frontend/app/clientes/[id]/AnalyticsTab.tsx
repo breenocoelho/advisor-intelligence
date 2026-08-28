@@ -13,6 +13,7 @@ type PortfolioEvolutionItem = { asset_class: string; pct_start: number; pct_end:
 type AssetClassSeries = { asset_class: string; points: SnapshotPoint[] };
 type CashAnalytics = { current: number; average: number; max: number; pct_of_aum_current: number | null };
 type FlowAnalytics = { gross_inflow: number; gross_outflow: number; net_flow: number };
+type MaturityBucket = { bucket: string; value: number };
 
 type Analytics = {
   aum_trend: SnapshotPoint[];
@@ -21,6 +22,14 @@ type Analytics = {
   class_series: AssetClassSeries[];
   cash_analytics: CashAnalytics | null;
   flow_analytics: FlowAnalytics | null;
+  maturity_profile: MaturityBucket[];
+};
+
+const MATURITY_BUCKET_LABELS: Record<string, string> = {
+  "0-30": "0–30 dias",
+  "31-90": "31–90 dias",
+  "91-180": "91–180 dias",
+  "180+": "180+ dias",
 };
 
 const CLASS_COLORS = ["#14181F", "#3E5C76", "#A6790A", "#3F7D5B", "#B23A48", "#7A5CB0", "#0E7C86", "#C77C2E"];
@@ -214,6 +223,25 @@ export default function AnalyticsTab({ clientId }: { clientId: string }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          )}
+
+          {/* Maturity Profile */}
+          {analytics.maturity_profile.some((b) => b.value > 0) && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+                Maturity Profile
+              </h2>
+              <div className="card grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+                {analytics.maturity_profile.map((b) => (
+                  <div key={b.bucket}>
+                    <p className="text-xs uppercase tracking-wide text-[#14181F]/40">
+                      {MATURITY_BUCKET_LABELS[b.bucket] ?? b.bucket}
+                    </p>
+                    <p className="mt-1 font-mono text-lg font-semibold tabular-nums">{formatCurrency(b.value)}</p>
+                  </div>
+                ))}
               </div>
             </section>
           )}

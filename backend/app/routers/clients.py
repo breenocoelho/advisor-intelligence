@@ -16,17 +16,34 @@ from app.schemas import (
     InteractionOut, RelationshipOverviewItem, ClientAnalyticsOut, PortfolioEvolutionItem,
     CashAnalyticsOut, FlowAnalyticsOut, AssetClassSeriesOut, ValueTrendPointOut, PerformanceAttributionItem,
     FieldOverrideOut, FieldOverrideIn, ClientExtendedFieldAssignmentOut,
+    BehavioralFindingOut, SegmentOut, ChangeItemOut, KeyInsightOut, MaturityBucketOut,
 )
 from app.services.intelligence.position_queries import latest_positions_query
 from app.services.intelligence.relationship_score import compute_relationship_score, get_contact_cadence_days, score_breakdown
 from app.services.intelligence.health_score import health_score_breakdown
 from app.services.intelligence.thresholds import preload_threshold_cache
+from app.services.intelligence.behavioral_health import compute_behavioral_findings
+from app.services.intelligence.segmentation import compute_segments
+from app.services.intelligence.what_changed import compute_client_what_changed
 from app.services.audit import log_action
 
 router = APIRouter()
 
 # peso de cada severidade no score de prioridade do cliente
 SEVERITY_WEIGHT = {"critical": 3, "opportunity": 2, "follow_up": 1}
+
+THRESHOLD_KEYS_FOR_SCORES = [
+    "idle_cash", "concentration_issuer", "high_value_aum_threshold",
+    "contact_cadence_high_value_days", "contact_cadence_standard_days", "contact_cadence_low_engagement_days",
+    "relationship_score_good", "relationship_score_warn",
+    "behavioral_anomaly_stdev_multiplier", "behavioral_anomaly_min_history_points", "segment_growth_pct",
+]
+
+
+def _aum_change_pct(snapshots: list) -> float | None:
+    if len(snapshots) < 2 or not snapshots[0].aum or float(snapshots[0].aum) <= 0:
+        return None
+    return (float(snapshots[-1].aum or 0) - float(snapshots[0].aum)) / float(snapshots[0].aum)
 
 
 def resolve_org_id(current_user: dict, db: Session) -> uuid.UUID | None:
@@ -74,6 +91,7 @@ def get_current_advisor_name(db: Session, client_id) -> str | None:
 
 @router.get("/", response_model=list[ClientOut])
 def list_clients(
+    segment: str | None = Query(default=None, description="filtra por segments[].key, ex: high_aum"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -138,11 +156,7 @@ def list_clients(
     # 1 query pra todos os thresholds usados no health/relationship score,
     # em vez de ~8 por cliente -- era o gargalo desse endpoint (centenas de
     # round-trips sequenciais pro Postgres do Railway)
-    threshold_cache = preload_threshold_cache(db, org_id, [
-        "idle_cash", "concentration_issuer", "high_value_aum_threshold",
-        "contact_cadence_high_value_days", "contact_cadence_standard_days", "contact_cadence_low_engagement_days",
-        "relationship_score_good", "relationship_score_warn",
-    ])
+    threshold_cache = preload_threshold_cache(db, org_id, THRESHOLD_KEYS_FOR_SCORES)
 
     results = []
     for client, advisor_name in clients:
@@ -152,6 +166,7 @@ def list_clients(
 
         client_snapshots = snapshots_by_client.get(client.id, [])
         latest_snapshot = client_snapshots[-1] if client_snapshots else None
+        has_interaction = client.id in interactions_by_client
 
         item = ClientOut.model_validate(client)
         item.advisor_name = advisor_name
@@ -172,7 +187,21 @@ def list_clients(
         item.relationship_score_band = relationship.band
         item.relationship_score_breakdown = score_breakdown(relationship)
 
+        behavioral_findings = compute_behavioral_findings(db, org_id, client, client_snapshots, cache=threshold_cache)
+        item.behavioral_findings = [BehavioralFindingOut(
+            finding_type=f.finding_type, severity=f.severity, label=f.label, detail=f.detail,
+        ) for f in behavioral_findings]
+
+        segments = compute_segments(
+            db, org_id, client, latest_snapshot, _aum_change_pct(client_snapshots),
+            relationship.band, relationship.score, behavioral_findings, has_interaction, cache=threshold_cache,
+        )
+        item.segments = [SegmentOut(key=s.key, label=s.label, category=s.category, reason=s.reason) for s in segments]
+
         results.append(item)
+
+    if segment:
+        results = [c for c in results if any(s.key == segment for s in c.segments)]
 
     # ordena por prioridade, nao mais so por AUM -- "diga quem merece atencao primeiro"
     results.sort(key=lambda c: c.priority_score, reverse=True)
@@ -334,6 +363,45 @@ def get_client_detail(
     item.relationship_score_breakdown = score_breakdown(relationship)
     item.relationship_score_components = relationship.components
     item.relationship_score_explanation = relationship.explanation
+
+    behavioral_findings = compute_behavioral_findings(db, org_id, client_row, snapshot_rows)
+    item.behavioral_findings = [BehavioralFindingOut(
+        finding_type=f.finding_type, severity=f.severity, label=f.label, detail=f.detail,
+    ) for f in behavioral_findings]
+
+    has_interaction = len(interactions_rows) > 0
+    segments = compute_segments(
+        db, org_id, client_row, latest_snapshot, _aum_change_pct(snapshot_rows),
+        relationship.band, relationship.score, behavioral_findings, has_interaction,
+    )
+    item.segments = [SegmentOut(key=s.key, label=s.label, category=s.category, reason=s.reason) for s in segments]
+
+    # Client Intelligence Summary (Prioridade 9) -- consolida os itens mais
+    # relevantes ja calculados nesta mesma request (zero query nova):
+    # alertas criticos abertos, insights novos, findings comportamentais e
+    # status de contato fora da cadencia.
+    key_insights: list[KeyInsightOut] = []
+    for alert in active_alerts:
+        # alertas "behavioral_*" sao o mesmo sinal que ja aparece via
+        # behavioral_findings logo abaixo -- nao duplica
+        if alert.severity == "critical" and not alert.alert_type.startswith("behavioral_"):
+            key_insights.append(KeyInsightOut(text=alert.explanation or alert.alert_type, severity="critical", link_tab="Alertas"))
+    for insight in insights_rows:
+        if insight.status == "new":
+            key_insights.append(KeyInsightOut(text=insight.title, severity=insight.severity, link_tab="Alertas"))
+    for finding in behavioral_findings:
+        key_insights.append(KeyInsightOut(text=f"{finding.label}: {finding.detail}", severity=finding.severity, link_tab="Overview"))
+    if client_row.last_contact_at is not None:
+        cadence_days = int(get_contact_cadence_days(db, org_id, client_row, has_any_interaction=has_interaction))
+        days_since = (date.today() - client_row.last_contact_at.date()).days
+        if days_since > cadence_days:
+            key_insights.append(KeyInsightOut(
+                text=f"Sem contato há {days_since} dias (cadência esperada: {cadence_days} dias)",
+                severity="follow_up", link_tab="Relationship",
+            ))
+    severity_rank = {"critical": 0, "opportunity": 1, "follow_up": 2}
+    key_insights.sort(key=lambda k: severity_rank.get(k.severity, 3))
+    item.key_insights = key_insights[:5]
 
     overrides = db.query(ClientFieldOverride).filter(ClientFieldOverride.client_id == client_row.id).all()
     item.field_overrides = {o.field_name: o.override_value for o in overrides}
@@ -513,6 +581,25 @@ def get_client_analytics(
             gross_inflow=gross_inflow, gross_outflow=gross_outflow, net_flow=gross_inflow - gross_outflow,
         )
 
+    # Maturity Profile -- posicoes atuais de RF/produtos com due_date,
+    # organizadas nos 4 buckets da spec. Nao infere liquidez de ativos sem
+    # due_date (ex: acoes, caixa) -- simplesmente ficam de fora do perfil.
+    today = date.today()
+    latest_ids = [p.id for p in latest_positions_query(db, client_row.id).all()]
+    maturity_buckets = {"0-30": 0.0, "31-90": 0.0, "91-180": 0.0, "180+": 0.0}
+    if latest_ids:
+        maturity_rows = (
+            db.query(Position.market_value, Asset.due_date)
+            .join(Asset, Position.asset_id == Asset.id)
+            .filter(Position.id.in_(latest_ids), Asset.due_date.isnot(None), Asset.due_date >= today)
+            .all()
+        )
+        for market_value, due_date in maturity_rows:
+            days = (due_date - today).days
+            bucket = "0-30" if days <= 30 else "31-90" if days <= 90 else "91-180" if days <= 180 else "180+"
+            maturity_buckets[bucket] += float(market_value or 0)
+    maturity_profile = [MaturityBucketOut(bucket=b, value=v) for b, v in maturity_buckets.items()]
+
     return ClientAnalyticsOut(
         aum_trend=aum_trend,
         aum_change_pct=aum_change_pct,
@@ -520,7 +607,29 @@ def get_client_analytics(
         class_series=class_series,
         cash_analytics=cash_analytics,
         flow_analytics=flow_analytics,
+        maturity_profile=maturity_profile,
     )
+
+
+@router.get("/{client_id}/what-changed", response_model=list[ChangeItemOut])
+def get_client_what_changed(
+    client_id: str,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """'What Changed?' (Prioridade 7) -- mesma fonte de verdade do
+    /analytics, so' que filtrando e formatando apenas as variacoes
+    materiais no periodo."""
+    org_id = resolve_org_id(current_user, db)
+    client_row = db.query(Client).filter(Client.id == client_id, Client.org_id == org_id).first()
+    if client_row is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
+
+    has_interaction = db.query(ClientInteraction).filter(ClientInteraction.client_id == client_row.id).first() is not None
+    items = compute_client_what_changed(db, org_id, client_row, from_date, to_date, has_interaction=has_interaction)
+    return [ChangeItemOut(label=i.label, direction=i.direction, value_display=i.value_display) for i in items]
 
 
 @router.get("/{client_id}/value-trend", response_model=list[ValueTrendPointOut])

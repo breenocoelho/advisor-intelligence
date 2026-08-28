@@ -37,6 +37,13 @@ type ClientPosition = {
   pct_of_client_aum: number | null;
 };
 
+type AdvisorExposure = {
+  advisor_id: string;
+  advisor_name: string;
+  total_exposure: number;
+  client_count: number;
+};
+
 type AssetDetail = {
   id: string;
   name: string;
@@ -57,6 +64,7 @@ type AssetDetail = {
   alerts: AlertRow[];
   tasks: TaskRow[];
   client_positions: ClientPosition[];
+  distribution_by_advisor: AdvisorExposure[];
 };
 
 const ASSET_CLASS_LABELS: Record<string, string> = {
@@ -83,6 +91,8 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   upcoming_maturity: "Vencimento próximo",
   relevant_movement: "Movimentação relevante",
   no_recent_contact: "Sem contato recente",
+  behavioral_unusual_movement: "Movimentação fora do padrão",
+  behavioral_unusual_allocation_shift: "Alocação fora do padrão",
 };
 
 function formatCurrency(value: number | null): string {
@@ -215,6 +225,39 @@ export default async function Asset360Page({ params }: { params: Promise<{ id: s
                     <td className="px-4 py-3 text-right font-mono tabular-nums">
                       {formatCurrency(point.total_value)}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Distribution by advisor (Cross-Client/Asset Intelligence) */}
+      {asset.distribution_by_advisor.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+            Distribuição por assessor
+          </h2>
+          <div className="overflow-hidden card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#14181F]/10 text-left text-xs uppercase tracking-wide text-[#14181F]/40">
+                  <th className="px-4 py-3 font-medium">Assessor</th>
+                  <th className="px-4 py-3 text-right font-medium">Exposição</th>
+                  <th className="px-4 py-3 text-right font-medium">Clientes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {asset.distribution_by_advisor.map((row) => (
+                  <tr key={row.advisor_id} className="border-b border-[#14181F]/5 last:border-0">
+                    <td className="px-4 py-3">
+                      <Link href={`/assessores/${row.advisor_id}`} className="font-medium hover:underline">
+                        {row.advisor_name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(row.total_exposure)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums">{row.client_count}</td>
                   </tr>
                 ))}
               </tbody>

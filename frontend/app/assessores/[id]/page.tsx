@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import SvgLineChart from "../../SvgLineChart";
 import AdvisorBenchmarkChart from "./AdvisorBenchmarkChart";
 import ProductMixTable from "./ProductMixTable";
+import WhatChangedCard from "../../WhatChangedCard";
 
 type TrendPoint = { snapshot_date: string; aum: number | null; client_count: number | null; net_flow: number | null };
 type ProductMixAssetItem = { asset_id: string; asset_name: string; value: number; pct_of_class: number };
@@ -83,6 +84,8 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
           </p>
         </div>
       </section>
+
+      <WhatChangedCard whatChangedUrl={`/advisors/${advisor.id}/what-changed`} />
 
       {advisor.trend.length > 0 && (
         <>

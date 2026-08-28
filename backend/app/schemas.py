@@ -10,6 +10,37 @@ class ScoreBreakdownItem(BaseModel):
     detail: str
 
 
+class BehavioralFindingOut(BaseModel):
+    finding_type: str
+    severity: str
+    label: str
+    detail: str
+
+
+class SegmentOut(BaseModel):
+    key: str
+    label: str
+    category: str  # "financial" | "relationship" | "behavioral"
+    reason: str
+
+
+class ChangeItemOut(BaseModel):
+    label: str
+    direction: str  # "up" | "down" | "neutral"
+    value_display: str
+
+
+class KeyInsightOut(BaseModel):
+    text: str
+    severity: str
+    link_tab: str
+
+
+class MaturityBucketOut(BaseModel):
+    bucket: str  # "0-30" | "31-90" | "91-180" | "180+"
+    value: float
+
+
 class ClientOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,6 +62,8 @@ class ClientOut(BaseModel):
     relationship_score: int | None = None
     relationship_score_band: str | None = None
     relationship_score_breakdown: list[ScoreBreakdownItem] = []
+    behavioral_findings: list[BehavioralFindingOut] = []
+    segments: list[SegmentOut] = []
 
 
 class AlertOut(BaseModel):
@@ -187,6 +220,13 @@ class AssetFlowItemOut(BaseModel):
     net_value: float
 
 
+class AssetAdvisorExposureOut(BaseModel):
+    advisor_id: UUID
+    advisor_name: str
+    total_exposure: float
+    client_count: int
+
+
 class AssetDetailOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -209,6 +249,7 @@ class AssetDetailOut(BaseModel):
     alerts: list[AlertOut] = []
     tasks: list[TaskOut] = []
     client_positions: list[AssetClientPositionOut] = []
+    distribution_by_advisor: list[AssetAdvisorExposureOut] = []
 
 
 class InteractionCreate(BaseModel):
@@ -278,6 +319,7 @@ class ClientAnalyticsOut(BaseModel):
     class_series: list[AssetClassSeriesOut] = []
     cash_analytics: CashAnalyticsOut | None = None
     flow_analytics: FlowAnalyticsOut | None = None
+    maturity_profile: list[MaturityBucketOut] = []
 
 
 class ValueTrendPointOut(BaseModel):
@@ -373,6 +415,28 @@ class ClientDetailOut(ClientOut):
     relationship_score_explanation: list[str] = []
     field_overrides: dict[str, str] = {}
     extended_fields: list[ClientExtendedFieldAssignmentOut] = []
+    key_insights: list[KeyInsightOut] = []
+
+
+class OpportunityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    client_id: UUID
+    client_name: str | None = None
+    opportunity_type: str
+    status: str
+    potential_value: float | None
+    urgency: int | None
+    confidence: int | None
+    score: int | None
+    explanation: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+
+
+class OpportunityStatusIn(BaseModel):
+    status: str
 
 
 class AuditLogOut(BaseModel):

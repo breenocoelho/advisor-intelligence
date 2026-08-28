@@ -9,8 +9,10 @@ from app.deps import get_db
 from app.models import Advisor, AdvisorDailySnapshot, ClientAdvisorHistory, Position, Asset, Account
 from app.schemas import (
     AdvisorOut, AdvisorDetailOut, AdvisorSnapshotPointOut, AdvisorProductMixItem, AdvisorProductMixAssetItem,
+    ChangeItemOut,
 )
 from app.routers.clients import resolve_org_id
+from app.services.intelligence.what_changed import compute_advisor_what_changed
 
 router = APIRouter()
 
@@ -152,3 +154,20 @@ def get_advisor_detail(
         trend=trend,
         product_mix=product_mix,
     )
+
+
+@router.get("/{advisor_id}/what-changed", response_model=list[ChangeItemOut])
+def get_advisor_what_changed(
+    advisor_id: str,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    org_id = resolve_org_id(current_user, db)
+    advisor = db.query(Advisor).filter(Advisor.id == advisor_id, Advisor.org_id == org_id).first()
+    if advisor is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Assessor não encontrado")
+
+    items = compute_advisor_what_changed(db, org_id, advisor, from_date, to_date)
+    return [ChangeItemOut(label=i.label, direction=i.direction, value_display=i.value_display) for i in items]

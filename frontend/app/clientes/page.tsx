@@ -16,6 +16,7 @@ type Client = {
   relationship_score: number | null;
   relationship_score_band: string | null;
   relationship_score_breakdown: ScoreBreakdownItem[];
+  segments: { key: string; label: string; category: string; reason: string }[];
 };
 
 async function getClients(): Promise<Client[]> {

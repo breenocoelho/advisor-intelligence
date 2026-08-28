@@ -28,6 +28,16 @@ DEFAULT_THRESHOLDS: dict[str, Decimal] = {
     "contact_cadence_low_engagement_days": Decimal("90"),
     "relationship_score_good": Decimal("80"),
     "relationship_score_warn": Decimal("60"),
+    # Client Health Intelligence -- anomalia comportamental usa o baseline
+    # do proprio cliente (media + k desvios-padrao), nao um valor fixo
+    "behavioral_anomaly_stdev_multiplier": Decimal("2"),
+    "behavioral_anomaly_min_history_points": Decimal("3"),
+    # "What Changed?" -- so' entra na lista se a variacao de AUM passar
+    # desse piso (evita listar ruido de flutuacao normal)
+    "what_changed_min_aum_delta_pct": Decimal("0.03"),
+    # Client Segmentation -- limite de crescimento/queda de AUM no periodo
+    # pra entrar no segmento Growing/Declining
+    "segment_growth_pct": Decimal("0.10"),
 }
 
 

@@ -23,9 +23,11 @@ function formatSuitability(value: string): string {
 export default function TodayClient({
   groups,
   relationship,
+  opportunityCount,
 }: {
   groups: ClientGroup[];
   relationship: RelationshipItem[];
+  opportunityCount: number;
 }) {
   const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
@@ -34,7 +36,6 @@ export default function TodayClient({
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
 
   const criticalCount = groups.flatMap((g) => g.items).filter((i) => i.severity === "critical").length;
-  const opportunityCount = groups.flatMap((g) => g.items).filter((i) => i.severity === "opportunity").length;
   const portfolioChangesCount = groups
     .flatMap((g) => g.items)
     .filter((i) => PORTFOLIO_CHANGE_TYPE_LABELS.includes(i.typeLabel)).length;

@@ -5,10 +5,10 @@ from sqlalchemy import func
 
 from app.auth import get_current_user
 from app.deps import get_db
-from app.models import Asset, Alert, Task, Client, Account, Position
+from app.models import Asset, Alert, Task, Client, Account, Position, Advisor, ClientAdvisorHistory
 from app.schemas import (
     AssetOut, AssetDetailOut, AssetSnapshotPointOut, AssetClientPositionOut, AlertOut, TaskOut,
-    AssetPriceTrendPointOut, AssetFlowItemOut,
+    AssetPriceTrendPointOut, AssetFlowItemOut, AssetAdvisorExposureOut,
 )
 from app.routers.clients import resolve_org_id
 from app.services.intelligence.position_queries import latest_positions_query_for_asset
@@ -142,6 +142,42 @@ def get_asset_detail(
         )
         for position, client in latest_rows
     ]
+
+    # Distribution by advisor (Prioridade 10 -- Cross-Client/Asset
+    # Intelligence): mesmos latest_rows ja buscados, so' agrupados pelo
+    # assessor atual de cada cliente em vez de por cliente.
+    client_ids = [client.id for _, client in latest_rows]
+    advisor_by_client = {
+        client_id: (advisor_id, advisor_name)
+        for client_id, advisor_id, advisor_name in (
+            db.query(ClientAdvisorHistory.client_id, Advisor.id, Advisor.name)
+            .join(Advisor, ClientAdvisorHistory.advisor_id == Advisor.id)
+            .filter(ClientAdvisorHistory.client_id.in_(client_ids), ClientAdvisorHistory.valid_to.is_(None))
+            .all()
+        )
+    } if client_ids else {}
+
+    exposure_by_advisor: dict = {}
+    clients_by_advisor: dict = {}
+    for position, client in latest_rows:
+        advisor_info = advisor_by_client.get(client.id)
+        if advisor_info is None:
+            continue
+        advisor_id, advisor_name = advisor_info
+        exposure_by_advisor[advisor_id] = exposure_by_advisor.get(advisor_id, 0.0) + float(position.market_value or 0)
+        clients_by_advisor.setdefault(advisor_id, set()).add(client.id)
+
+    advisor_names = {aid: name for aid, name in advisor_by_client.values()}
+    item.distribution_by_advisor = sorted(
+        [
+            AssetAdvisorExposureOut(
+                advisor_id=advisor_id, advisor_name=advisor_names.get(advisor_id, "—"),
+                total_exposure=exposure, client_count=len(clients_by_advisor.get(advisor_id, set())),
+            )
+            for advisor_id, exposure in exposure_by_advisor.items()
+        ],
+        key=lambda a: a.total_exposure, reverse=True,
+    )
 
     return item
 

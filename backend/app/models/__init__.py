@@ -20,3 +20,4 @@ from app.models.client_field_override import ClientFieldOverride
 from app.models.client_extended_field import (
     ClientExtendedFieldDefinition, ClientExtendedFieldOption, ClientExtendedFieldAssignment,
 )
+from app.models.opportunity import Opportunity

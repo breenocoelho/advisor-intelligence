@@ -33,6 +33,9 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   upcoming_maturity: "Vencimento próximo",
   relevant_movement: "Movimentação relevante",
   no_recent_contact: "Sem contato recente",
+  followup_overdue: "Follow-up atrasado",
+  behavioral_unusual_movement: "Movimentação fora do padrão",
+  behavioral_unusual_allocation_shift: "Alocação fora do padrão",
 };
 
 const INSIGHT_TYPE_LABELS: Record<string, string> = {
@@ -66,6 +69,20 @@ async function getInsights(): Promise<InsightRow[]> {
 
   if (!res.ok) return [];
   return res.json();
+}
+
+async function getOpenOpportunitiesCount(): Promise<number> {
+  const { getToken } = await auth();
+  const token = await getToken();
+
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/opportunities/`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+
+  if (!res.ok) return 0;
+  const opportunities: { status: string }[] = await res.json();
+  return opportunities.filter((o) => !["won", "lost", "closed"].includes(o.status)).length;
 }
 
 async function getRelationshipOverview(): Promise<RelationshipItem[]> {
@@ -148,10 +165,11 @@ function buildGroups(alerts: AlertRow[], insights: InsightRow[]): ClientGroup[] 
 }
 
 export default async function Today() {
-  const [alerts, insights, relationship] = await Promise.all([
+  const [alerts, insights, relationship, opportunityCount] = await Promise.all([
     getAlerts(),
     getInsights(),
     getRelationshipOverview(),
+    getOpenOpportunitiesCount(),
   ]);
   const groups = buildGroups(alerts, insights);
   const totalOpen = alerts.length + insights.length;
@@ -181,7 +199,7 @@ export default async function Today() {
           </p>
         </div>
       ) : (
-        <TodayClient groups={groups} relationship={relationship} />
+        <TodayClient groups={groups} relationship={relationship} opportunityCount={opportunityCount} />
       )}
     </main>
   );

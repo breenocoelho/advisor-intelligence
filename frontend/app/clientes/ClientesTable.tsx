@@ -18,6 +18,13 @@ type Client = {
   relationship_score: number | null;
   relationship_score_band: string | null;
   relationship_score_breakdown: ScoreBreakdownItem[];
+  segments: { key: string; label: string; category: string; reason: string }[];
+};
+
+const SEGMENT_CATEGORY_COLORS: Record<string, string> = {
+  financial: "#3E5C76",
+  relationship: "#A6790A",
+  behavioral: "#7A5CB0",
 };
 
 type SortKey =
@@ -50,6 +57,7 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
   const [search, setSearch] = useState("");
   const [advisorFilter, setAdvisorFilter] = useState<Set<string>>(new Set());
   const [suitabilityFilter, setSuitabilityFilter] = useState<Set<string>>(new Set());
+  const [segmentFilter, setSegmentFilter] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("priority_score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -61,6 +69,12 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
   const suitabilities = useMemo(() => {
     const set = new Set(clients.map((c) => c.suitability).filter(Boolean) as string[]);
     return Array.from(set).sort();
+  }, [clients]);
+
+  const segments = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of clients) for (const s of c.segments) map.set(s.key, s.label);
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [clients]);
 
   function handleSort(key: string) {
@@ -79,7 +93,8 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
       (c.xp_client_id ?? "").includes(search);
     const matchesAdvisor = advisorFilter.size === 0 || (c.advisor_name && advisorFilter.has(c.advisor_name));
     const matchesSuitability = suitabilityFilter.size === 0 || (c.suitability && suitabilityFilter.has(c.suitability));
-    return matchesSearch && matchesAdvisor && matchesSuitability;
+    const matchesSegment = segmentFilter.size === 0 || c.segments.some((s) => segmentFilter.has(s.key));
+    return matchesSearch && matchesAdvisor && matchesSuitability && matchesSegment;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -94,7 +109,7 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const hasActiveFilters = advisorFilter.size > 0 || suitabilityFilter.size > 0;
+  const hasActiveFilters = advisorFilter.size > 0 || suitabilityFilter.size > 0 || segmentFilter.size > 0;
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row">
@@ -107,6 +122,7 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
                 onClick={() => {
                   setAdvisorFilter(new Set());
                   setSuitabilityFilter(new Set());
+                  setSegmentFilter(new Set());
                 }}
                 className="text-xs font-medium text-[#14181F]/40 hover:text-[#14181F]/70"
               >
@@ -147,6 +163,24 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
                 ))}
               </div>
             </div>
+            {segments.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#14181F]/40">Segmento</p>
+                <div className="space-y-1.5">
+                  {segments.map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={segmentFilter.has(key)}
+                        onChange={() => setSegmentFilter((prev) => toggleInSet(prev, key))}
+                        className="h-3.5 w-3.5 rounded border-[#14181F]/30"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -192,6 +226,23 @@ export default function ClientesTable({ clients }: { clients: Client[] }) {
                         {client.name}
                       </Link>
                       <p className="text-xs text-[#14181F]/40">#{client.xp_client_id}</p>
+                      {client.segments.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {client.segments.map((s) => (
+                            <span
+                              key={s.key}
+                              title={s.reason}
+                              className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{
+                                backgroundColor: `${SEGMENT_CATEGORY_COLORS[s.category]}1a`,
+                                color: SEGMENT_CATEGORY_COLORS[s.category],
+                              }}
+                            >
+                              {s.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-[#14181F]/70">{client.advisor_name ?? "—"}</td>
                     <td className="px-4 py-3 text-[#14181F]/70">

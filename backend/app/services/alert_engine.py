@@ -9,10 +9,11 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.models import Client, Asset, Alert, Position, ClientInteraction, Task
+from app.models import Client, Asset, Alert, Position, ClientInteraction, Task, ClientDailySnapshot
 from app.services.intelligence.position_queries import latest_positions_query
 from app.services.intelligence.thresholds import get_threshold
 from app.services.intelligence.relationship_score import get_contact_cadence_days
+from app.services.intelligence.behavioral_health import compute_behavioral_findings
 
 
 @dataclass
@@ -222,6 +223,23 @@ def rule_followup_overdue(db, client: Client, today: date | None = None) -> list
     return findings
 
 
+def rule_behavioral_anomaly(db, client: Client) -> list[Finding]:
+    """Client Health Intelligence, camada Behavioral -- compara o cliente
+    contra o proprio baseline historico (nao um valor fixo). Ver
+    app.services.intelligence.behavioral_health."""
+    snapshots = (
+        db.query(ClientDailySnapshot)
+        .filter(ClientDailySnapshot.client_id == client.id)
+        .order_by(ClientDailySnapshot.snapshot_date)
+        .all()
+    )
+    findings = compute_behavioral_findings(db, client.org_id, client, snapshots)
+    return [
+        Finding(alert_type=f"behavioral_{f.finding_type}", severity=f.severity, explanation=f"{f.label}: {f.detail}")
+        for f in findings
+    ]
+
+
 ALL_RULES = [
     rule_idle_cash,
     rule_concentration,
@@ -229,6 +247,7 @@ ALL_RULES = [
     rule_relevant_movement,
     rule_no_recent_contact,
     rule_followup_overdue,
+    rule_behavioral_anomaly,
 ]
 
 

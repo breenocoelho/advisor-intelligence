@@ -5,7 +5,9 @@ import PortfolioAnalyticsTab from "./PortfolioAnalyticsTab";
 import RelationshipPanel from "./RelationshipPanel";
 import SvgLineChart from "../../SvgLineChart";
 import OverridableField from "./OverridableField";
-import type { ScoreBreakdownItem } from "../../ScoreTooltip";
+import ScoreTooltip, { type ScoreBreakdownItem } from "../../ScoreTooltip";
+import KeyInsights, { type KeyInsightItem } from "./KeyInsights";
+import WhatChangedCard from "../../WhatChangedCard";
 
 export type Position = {
   id: string;
@@ -63,6 +65,9 @@ export type InteractionItem = {
   created_at: string | null;
 };
 
+export type BehavioralFinding = { finding_type: string; severity: "critical" | "opportunity" | "follow_up"; label: string; detail: string };
+export type Segment = { key: string; label: string; category: "financial" | "relationship" | "behavioral"; reason: string };
+
 export type ClientDetail = {
   id: string;
   xp_client_id: string | null;
@@ -97,6 +102,9 @@ export type ClientDetail = {
   relationship_score_explanation: string[];
   field_overrides: Record<string, string>;
   extended_fields: { assignment_id: string; field_key: string; field_label: string; option_id: string; option_value: string }[];
+  behavioral_findings: BehavioralFinding[];
+  segments: Segment[];
+  key_insights: KeyInsightItem[];
 };
 
 const SEVERITY_CONFIG = {
@@ -112,6 +120,14 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   relevant_movement: "Movimentação relevante",
   no_recent_contact: "Sem contato recente",
   followup_overdue: "Follow-up atrasado",
+  behavioral_unusual_movement: "Movimentação fora do padrão",
+  behavioral_unusual_allocation_shift: "Alocação fora do padrão",
+};
+
+const SEGMENT_CATEGORY_COLORS: Record<string, string> = {
+  financial: "#3E5C76",
+  relationship: "#A6790A",
+  behavioral: "#7A5CB0",
 };
 
 const INSIGHT_TYPE_LABELS: Record<string, string> = {
@@ -208,6 +224,69 @@ export default function ClientTabs({
 
       {activeTab === "Overview" && (
         <div>
+          <KeyInsights items={client.key_insights} onNavigate={(tab) => setActiveTab(tab as Tab)} />
+
+          {client.segments.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">Segmentos</h2>
+              <div className="flex flex-wrap gap-2">
+                {client.segments.map((s) => (
+                  <span
+                    key={s.key}
+                    title={s.reason}
+                    className="rounded-full px-2.5 py-1 text-xs font-medium"
+                    style={{ backgroundColor: `${SEGMENT_CATEGORY_COLORS[s.category]}1a`, color: SEGMENT_CATEGORY_COLORS[s.category] }}
+                  >
+                    {s.label}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="mb-10">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">Client Health</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="card p-4">
+                <p className="mb-2 text-xs uppercase tracking-wide text-[#14181F]/40">Portfolio Health</p>
+                {client.health_score !== null ? (
+                  <ScoreTooltip score={client.health_score} breakdown={client.health_score_breakdown} />
+                ) : (
+                  <span className="text-sm text-[#14181F]/25">—</span>
+                )}
+              </div>
+              <div className="card p-4">
+                <p className="mb-2 text-xs uppercase tracking-wide text-[#14181F]/40">Relationship Health</p>
+                {client.relationship_score !== null ? (
+                  <ScoreTooltip
+                    score={client.relationship_score}
+                    band={client.relationship_score_band}
+                    breakdown={client.relationship_score_breakdown}
+                  />
+                ) : (
+                  <span className="text-sm text-[#14181F]/25">—</span>
+                )}
+              </div>
+              <div className="card p-4">
+                <p className="mb-2 text-xs uppercase tracking-wide text-[#14181F]/40">Behavioral Health</p>
+                {client.behavioral_findings.length === 0 ? (
+                  <p className="text-sm text-[#3F7D5B]">Nenhuma anomalia detectada</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {client.behavioral_findings.map((f, i) => (
+                      <li key={i} className="text-xs">
+                        <span className="font-medium text-[#B23A48]">{f.label}</span>
+                        <span className="block text-[#14181F]/60">{f.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <WhatChangedCard whatChangedUrl={`/clients/${client.id}/what-changed`} />
+
           <section className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="card p-4">
               <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Código da conta</p>
