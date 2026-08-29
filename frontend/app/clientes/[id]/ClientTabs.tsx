@@ -67,6 +67,8 @@ export type InteractionItem = {
 
 export type BehavioralFinding = { finding_type: string; severity: "critical" | "opportunity" | "follow_up"; label: string; detail: string };
 export type Segment = { key: string; label: string; category: "financial" | "relationship" | "behavioral"; reason: string };
+export type TopPosition = { asset_name: string; market_value: number; pct_of_aum: number };
+export type IssuerExposure = { issuer: string; value: number; pct_of_aum: number };
 
 export type ClientDetail = {
   id: string;
@@ -105,6 +107,8 @@ export type ClientDetail = {
   behavioral_findings: BehavioralFinding[];
   segments: Segment[];
   key_insights: KeyInsightItem[];
+  top_positions: TopPosition[];
+  issuer_breakdown: IssuerExposure[];
 };
 
 const SEVERITY_CONFIG = {
@@ -418,7 +422,12 @@ export default function ClientTabs({
       )}
 
       {activeTab === "Portfolio Analytics" && (
-        <PortfolioAnalyticsTab clientId={client.id} positionDates={positionDates} />
+        <PortfolioAnalyticsTab
+          clientId={client.id}
+          positionDates={positionDates}
+          topPositions={client.top_positions}
+          issuerBreakdown={client.issuer_breakdown}
+        />
       )}
 
       {activeTab === "Relationship" && <RelationshipPanel client={client} />}

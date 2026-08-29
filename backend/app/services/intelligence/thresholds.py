@@ -38,6 +38,9 @@ DEFAULT_THRESHOLDS: dict[str, Decimal] = {
     # Client Segmentation -- limite de crescimento/queda de AUM no periodo
     # pra entrar no segmento Growing/Declining
     "segment_growth_pct": Decimal("0.10"),
+    # Relationship Score -- oportunidade detectada e nao revisada ha mais
+    # que isso penaliza o componente opportunity_followup
+    "opportunity_followup_stale_days": Decimal("14"),
 }
 
 

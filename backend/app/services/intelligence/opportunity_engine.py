@@ -21,6 +21,14 @@ CONFIDENCE_BY_TYPE = {
     "upcoming_maturity": 80,
 }
 
+# Prioridade 11 (Fase 5) -- texto estatico por tipo, resolvido no router.
+# Nao e' uma entidade Recommendation (isso e' P13/14, lifecycle de workflow,
+# fora de escopo) -- so' fecha o "o que fazer com isso" sem criar tabela nova.
+RECOMMENDED_ACTION_BY_TYPE = {
+    "idle_cash": "Contatar cliente para propor alocação do caixa ocioso.",
+    "upcoming_maturity": "Agendar contato para definir realocação antes do resgate cair em conta.",
+}
+
 _CURRENCY_RE = re.compile(r"R\$\s*([\d,]+\.\d{2})")
 _DAYS_RE = re.compile(r"vence em (\d+) dia")
 

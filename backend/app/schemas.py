@@ -37,8 +37,20 @@ class KeyInsightOut(BaseModel):
 
 
 class MaturityBucketOut(BaseModel):
-    bucket: str  # "0-30" | "31-90" | "91-180" | "180+"
+    bucket: str  # "0-30" | "31-90" | "91-180" | "180+" (ou Immediate/Short/Medium/Long Term p/ liquidez)
     value: float
+
+
+class TopPositionOut(BaseModel):
+    asset_name: str
+    market_value: float
+    pct_of_aum: float
+
+
+class IssuerExposureOut(BaseModel):
+    issuer: str
+    value: float
+    pct_of_aum: float
 
 
 class ClientOut(BaseModel):
@@ -250,6 +262,10 @@ class AssetDetailOut(BaseModel):
     tasks: list[TaskOut] = []
     client_positions: list[AssetClientPositionOut] = []
     distribution_by_advisor: list[AssetAdvisorExposureOut] = []
+    total_exposure: float = 0.0
+    client_count: int = 0
+    average_exposure: float = 0.0
+    largest_exposure: float = 0.0
 
 
 class InteractionCreate(BaseModel):
@@ -320,6 +336,10 @@ class ClientAnalyticsOut(BaseModel):
     cash_analytics: CashAnalyticsOut | None = None
     flow_analytics: FlowAnalyticsOut | None = None
     maturity_profile: list[MaturityBucketOut] = []
+    liquidity_profile: list[MaturityBucketOut] = []
+    issuer_series: list[AssetClassSeriesOut] = []
+    indexer_series: list[AssetClassSeriesOut] = []
+    portfolio_drift_pp: float = 0.0
 
 
 class ValueTrendPointOut(BaseModel):
@@ -355,6 +375,7 @@ class AdvisorOut(BaseModel):
     client_count: int = 0
     net_flow: float = 0.0
     aum_growth_pct: float | None = None
+    opportunity_count: int = 0
 
 
 class AdvisorSnapshotPointOut(BaseModel):
@@ -378,6 +399,18 @@ class AdvisorProductMixItem(BaseModel):
     assets: list[AdvisorProductMixAssetItem] = []
 
 
+class AdvisorOpportunityDistributionItem(BaseModel):
+    opportunity_type: str
+    count: int
+
+
+class AdvisorKeyInsightOut(BaseModel):
+    text: str
+    severity: str
+    client_id: UUID
+    client_name: str
+
+
 class AdvisorDetailOut(BaseModel):
     id: UUID
     name: str
@@ -387,6 +420,44 @@ class AdvisorDetailOut(BaseModel):
     avg_aum_per_client: float = 0.0
     trend: list[AdvisorSnapshotPointOut] = []
     product_mix: list[AdvisorProductMixItem] = []
+    contact_coverage_pct: float | None = None
+    relationship_coverage_pct: float | None = None
+    retention_pct: float | None = None
+    opportunity_distribution: list[AdvisorOpportunityDistributionItem] = []
+    key_insights: list[AdvisorKeyInsightOut] = []
+
+
+class OfficePortfolioMixItem(BaseModel):
+    asset_class: str
+    value: float
+    pct: float
+
+
+class OfficeSegmentFlagOut(BaseModel):
+    segment_key: str
+    segment_label: str
+    count: int
+
+
+class OfficeAdvisorFlagOut(BaseModel):
+    advisor_id: UUID
+    advisor_name: str
+    aum_growth_pct: float | None
+
+
+class OfficeSummaryOut(BaseModel):
+    aum_total: float = 0.0
+    aum_growth_pct: float | None = None
+    aum_trend: list[AdvisorSnapshotPointOut] = []
+    net_flow_total: float = 0.0
+    client_count: int = 0
+    advisor_count: int = 0
+    avg_aum_per_client: float = 0.0
+    avg_aum_per_advisor: float = 0.0
+    advisor_leaderboard: list[AdvisorOut] = []
+    portfolio_mix: list[OfficePortfolioMixItem] = []
+    segment_flags: list[OfficeSegmentFlagOut] = []
+    advisors_declining: list[OfficeAdvisorFlagOut] = []
 
 
 class ClientExtendedFieldAssignmentOut(BaseModel):
@@ -416,6 +487,8 @@ class ClientDetailOut(ClientOut):
     field_overrides: dict[str, str] = {}
     extended_fields: list[ClientExtendedFieldAssignmentOut] = []
     key_insights: list[KeyInsightOut] = []
+    top_positions: list[TopPositionOut] = []
+    issuer_breakdown: list[IssuerExposureOut] = []
 
 
 class OpportunityOut(BaseModel):
@@ -431,6 +504,7 @@ class OpportunityOut(BaseModel):
     confidence: int | None
     score: int | None
     explanation: str | None
+    recommended_action: str | None = None
     created_at: datetime | None
     updated_at: datetime | None
 

@@ -8,6 +8,7 @@ type Advisor = {
   client_count: number;
   net_flow: number;
   aum_growth_pct: number | null;
+  opportunity_count: number;
 };
 
 function formatCurrency(value: number): string {

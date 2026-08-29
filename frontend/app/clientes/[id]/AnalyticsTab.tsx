@@ -23,6 +23,10 @@ type Analytics = {
   cash_analytics: CashAnalytics | null;
   flow_analytics: FlowAnalytics | null;
   maturity_profile: MaturityBucket[];
+  liquidity_profile: MaturityBucket[];
+  issuer_series: AssetClassSeries[];
+  indexer_series: AssetClassSeries[];
+  portfolio_drift_pp: number;
 };
 
 const MATURITY_BUCKET_LABELS: Record<string, string> = {
@@ -31,6 +35,15 @@ const MATURITY_BUCKET_LABELS: Record<string, string> = {
   "91-180": "91–180 dias",
   "180+": "180+ dias",
 };
+
+const LIQUIDITY_BUCKET_LABELS: Record<string, string> = {
+  "Immediate": "Imediata",
+  "Short Term": "Curto prazo",
+  "Medium Term": "Médio prazo",
+  "Long Term": "Longo prazo",
+};
+
+const SERIES_COLORS = ["#14181F", "#3E5C76", "#A6790A", "#3F7D5B", "#B23A48", "#7A5CB0", "#0E7C86", "#C77C2E"];
 
 const CLASS_COLORS = ["#14181F", "#3E5C76", "#A6790A", "#3F7D5B", "#B23A48", "#7A5CB0", "#0E7C86", "#C77C2E"];
 
@@ -171,9 +184,14 @@ export default function AnalyticsTab({ clientId }: { clientId: string }) {
           {/* Portfolio Evolution */}
           {analytics.portfolio_evolution.length > 0 && (
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
-                Portfolio Evolution
-              </h2>
+              <div className="mb-3 flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+                  Portfolio Evolution
+                </h2>
+                <span className="text-xs text-[#14181F]/50">
+                  Portfolio Drift: <span className="font-mono font-semibold tabular-nums text-[#14181F]">{analytics.portfolio_drift_pp.toFixed(1)}pp</span>
+                </span>
+              </div>
               {analytics.class_series.length > 0 && (
                 <div className="card mb-3 p-4">
                   <SvgMultiLineChart
@@ -244,6 +262,69 @@ export default function AnalyticsTab({ clientId }: { clientId: string }) {
                 ))}
               </div>
             </section>
+          )}
+
+          {/* Liquidity Profile */}
+          {analytics.liquidity_profile.some((b) => b.value > 0) && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+                Liquidity Profile
+              </h2>
+              <div className="card grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+                {analytics.liquidity_profile.map((b) => (
+                  <div key={b.bucket}>
+                    <p className="text-xs uppercase tracking-wide text-[#14181F]/40">
+                      {LIQUIDITY_BUCKET_LABELS[b.bucket] ?? b.bucket}
+                    </p>
+                    <p className="mt-1 font-mono text-lg font-semibold tabular-nums">{formatCurrency(b.value)}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Mix por emissor / indexador */}
+          {(analytics.issuer_series.length > 0 || analytics.indexer_series.length > 0) && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {analytics.issuer_series.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+                    Mix por Emissor
+                  </h2>
+                  <div className="card p-4">
+                    <SvgMultiLineChart
+                      series={analytics.issuer_series.map((s, i) => ({
+                        name: s.asset_class,
+                        color: SERIES_COLORS[i % SERIES_COLORS.length],
+                        points: s.points
+                          .filter((p) => p.aum !== null)
+                          .map((p) => ({ label: formatDateShort(p.snapshot_date), value: p.aum as number })),
+                      }))}
+                      formatValue={formatCurrency}
+                    />
+                  </div>
+                </section>
+              )}
+              {analytics.indexer_series.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+                    Mix por Indexador
+                  </h2>
+                  <div className="card p-4">
+                    <SvgMultiLineChart
+                      series={analytics.indexer_series.map((s, i) => ({
+                        name: s.asset_class,
+                        color: SERIES_COLORS[i % SERIES_COLORS.length],
+                        points: s.points
+                          .filter((p) => p.aum !== null)
+                          .map((p) => ({ label: formatDateShort(p.snapshot_date), value: p.aum as number })),
+                      }))}
+                      formatValue={formatCurrency}
+                    />
+                  </div>
+                </section>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

@@ -10,6 +10,7 @@ from app.models import (
     Client, Organization, Advisor, ClientAdvisorHistory, Alert, Asset, Position, Task,
     Insight, ClientDailySnapshot, Account, ClientInteraction, ClientFieldOverride,
     ClientExtendedFieldAssignment, ClientExtendedFieldOption, ClientExtendedFieldDefinition,
+    Opportunity,
 )
 from app.schemas import (
     ClientOut, ClientDetailOut, AlertOut, PositionOut, TaskOut, InsightOut, SnapshotPointOut,
@@ -17,9 +18,12 @@ from app.schemas import (
     CashAnalyticsOut, FlowAnalyticsOut, AssetClassSeriesOut, ValueTrendPointOut, PerformanceAttributionItem,
     FieldOverrideOut, FieldOverrideIn, ClientExtendedFieldAssignmentOut,
     BehavioralFindingOut, SegmentOut, ChangeItemOut, KeyInsightOut, MaturityBucketOut,
+    TopPositionOut, IssuerExposureOut,
 )
 from app.services.intelligence.position_queries import latest_positions_query
-from app.services.intelligence.relationship_score import compute_relationship_score, get_contact_cadence_days, score_breakdown
+from app.services.intelligence.relationship_score import (
+    compute_relationship_score, get_contact_cadence_days, score_breakdown, classify_contact_status,
+)
 from app.services.intelligence.health_score import health_score_breakdown
 from app.services.intelligence.thresholds import preload_threshold_cache
 from app.services.intelligence.behavioral_health import compute_behavioral_findings
@@ -37,7 +41,23 @@ THRESHOLD_KEYS_FOR_SCORES = [
     "contact_cadence_high_value_days", "contact_cadence_standard_days", "contact_cadence_low_engagement_days",
     "relationship_score_good", "relationship_score_warn",
     "behavioral_anomaly_stdev_multiplier", "behavioral_anomaly_min_history_points", "segment_growth_pct",
+    "opportunity_followup_stale_days",
 ]
+
+LIQUIDITY_BUCKETS = ["Immediate", "Short Term", "Medium Term", "Long Term"]
+
+
+def _liquidity_bucket(liquidity_days) -> str | None:
+    if liquidity_days is None:
+        return None
+    days = float(liquidity_days)
+    if days <= 0:
+        return "Immediate"
+    if days <= 30:
+        return "Short Term"
+    if days <= 180:
+        return "Medium Term"
+    return "Long Term"
 
 
 def _aum_change_pct(snapshots: list) -> float | None:
@@ -153,6 +173,14 @@ def list_clients(
     for t in all_tasks:
         tasks_by_client.setdefault(t.client_id, []).append(t)
 
+    all_opportunities = (
+        db.query(Opportunity).filter(Opportunity.client_id.in_(client_ids)).all()
+        if client_ids else []
+    )
+    opportunities_by_client: dict[uuid.UUID, list] = {}
+    for o in all_opportunities:
+        opportunities_by_client.setdefault(o.client_id, []).append(o)
+
     # 1 query pra todos os thresholds usados no health/relationship score,
     # em vez de ~8 por cliente -- era o gargalo desse endpoint (centenas de
     # round-trips sequenciais pro Postgres do Railway)
@@ -181,6 +209,7 @@ def list_clients(
             interactions=interactions_by_client.get(client.id, []),
             tasks=tasks_by_client.get(client.id, []),
             aum_history=[s.aum for s in client_snapshots],
+            open_opportunities=opportunities_by_client.get(client.id, []),
             cache=threshold_cache,
         )
         item.relationship_score = relationship.score
@@ -237,13 +266,7 @@ def relationship_overview(
         has_interaction = client.id in client_ids_with_interaction
         cadence_days = int(get_contact_cadence_days(db, org_id, client, has_any_interaction=has_interaction, cache=threshold_cache))
         days_since = (today - client.last_contact_at.date()).days if client.last_contact_at else None
-
-        if days_since is None or days_since > cadence_days:
-            item_status = "overdue"
-        elif days_since > cadence_days * 0.7:
-            item_status = "approaching"
-        else:
-            item_status = "ok"
+        item_status = classify_contact_status(days_since, cadence_days)
 
         results.append(RelationshipOverviewItem(
             id=client.id, name=client.name, days_since_contact=days_since,
@@ -306,6 +329,29 @@ def get_client_detail(
 
     item.positions = [_build_position_out(position, asset) for position, asset in positions_rows]
 
+    # Top posições e emissores (Client Health, Fase 5) -- derivados dos
+    # mesmos positions_rows acima (ja ordenados por market_value desc),
+    # zero query nova
+    aum_for_pct = float(client_row.aum) if client_row.aum else 0.0
+    if aum_for_pct > 0:
+        item.top_positions = [
+            TopPositionOut(
+                asset_name=asset.name, market_value=float(position.market_value or 0),
+                pct_of_aum=float(position.market_value or 0) / aum_for_pct * 100,
+            )
+            for position, asset in positions_rows[:3]
+        ]
+        issuer_totals: dict[str, float] = {}
+        for position, asset in positions_rows:
+            if not asset.issuer:
+                continue
+            issuer_totals[asset.issuer] = issuer_totals.get(asset.issuer, 0.0) + float(position.market_value or 0)
+        top_issuers = sorted(issuer_totals.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        item.issuer_breakdown = [
+            IssuerExposureOut(issuer=issuer, value=value, pct_of_aum=value / aum_for_pct * 100)
+            for issuer, value in top_issuers
+        ]
+
     item.alerts = []
     for alert in alerts_rows:
         alert_out = AlertOut.model_validate(alert)
@@ -352,11 +398,14 @@ def get_client_detail(
     )
     item.interactions = [InteractionOut.model_validate(i) for i in interactions_rows]
 
+    opportunities_rows = db.query(Opportunity).filter(Opportunity.client_id == client_row.id).all()
+
     relationship = compute_relationship_score(
         db, org_id, client_row,
         interactions=interactions_rows,
         tasks=tasks_rows,
         aum_history=[s.aum for s in snapshot_rows],
+        open_opportunities=opportunities_rows,
     )
     item.relationship_score = relationship.score
     item.relationship_score_band = relationship.band
@@ -600,6 +649,58 @@ def get_client_analytics(
             maturity_buckets[bucket] += float(market_value or 0)
     maturity_profile = [MaturityBucketOut(bucket=b, value=v) for b, v in maturity_buckets.items()]
 
+    # Liquidity Profile (distinto do Maturity Profile acima: usa
+    # liquidity_days -- prazo de resgate -- em vez de due_date -- vencimento
+    # do titulo). So' entra quem tem o dado; sem inferencia.
+    liquidity_buckets = {b: 0.0 for b in LIQUIDITY_BUCKETS}
+    if latest_ids:
+        liquidity_rows = (
+            db.query(Position.market_value, Asset.liquidity_days)
+            .join(Asset, Position.asset_id == Asset.id)
+            .filter(Position.id.in_(latest_ids))
+            .all()
+        )
+        for market_value, liquidity_days in liquidity_rows:
+            bucket = _liquidity_bucket(liquidity_days)
+            if bucket:
+                liquidity_buckets[bucket] += float(market_value or 0)
+    liquidity_profile = [MaturityBucketOut(bucket=b, value=v) for b, v in liquidity_buckets.items()]
+
+    # Mix por emissor/indexador ao longo do tempo -- direto de Position
+    # historico (nao do allocation_json do snapshot, que so tem granularidade
+    # de classe). Limitado aos 8 maiores pra nao virar sopa de linhas no grafico.
+    def _grouped_series(group_col):
+        rows_query = (
+            db.query(Position.position_date, group_col, func.sum(Position.market_value))
+            .join(Asset, Position.asset_id == Asset.id)
+            .join(Account, Position.account_id == Account.id)
+            .filter(Account.client_id == client_row.id, group_col.isnot(None))
+            .group_by(Position.position_date, group_col)
+        )
+        if from_date:
+            rows_query = rows_query.filter(Position.position_date >= from_date)
+        if to_date:
+            rows_query = rows_query.filter(Position.position_date <= to_date)
+
+        series_map: dict[str, list[SnapshotPointOut]] = {}
+        totals: dict[str, float] = {}
+        for pos_date, label, total in rows_query.all():
+            value = float(total or 0)
+            series_map.setdefault(label, []).append(SnapshotPointOut(snapshot_date=pos_date, aum=value, health_score=None))
+            totals[label] = totals.get(label, 0.0) + value
+
+        top_labels = {label for label, _ in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:8]}
+        return [
+            AssetClassSeriesOut(asset_class=label, points=sorted(points, key=lambda p: p.snapshot_date))
+            for label, points in sorted(series_map.items())
+            if label in top_labels
+        ]
+
+    issuer_series = _grouped_series(Asset.issuer)
+    indexer_series = _grouped_series(Asset.index_description)
+
+    portfolio_drift_pp = sum(abs(item.delta_pp) for item in portfolio_evolution)
+
     return ClientAnalyticsOut(
         aum_trend=aum_trend,
         aum_change_pct=aum_change_pct,
@@ -608,6 +709,10 @@ def get_client_analytics(
         cash_analytics=cash_analytics,
         flow_analytics=flow_analytics,
         maturity_profile=maturity_profile,
+        liquidity_profile=liquidity_profile,
+        issuer_series=issuer_series,
+        indexer_series=indexer_series,
+        portfolio_drift_pp=portfolio_drift_pp,
     )
 
 

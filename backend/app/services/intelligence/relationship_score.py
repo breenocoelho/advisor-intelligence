@@ -15,11 +15,25 @@ from decimal import Decimal
 from app.schemas import ScoreBreakdownItem
 from app.services.intelligence.thresholds import get_threshold
 
-RECENCY_WEIGHT = Decimal("0.25")
-FREQUENCY_WEIGHT = Decimal("0.20")
-ENGAGEMENT_WEIGHT = Decimal("0.20")
-AUM_STABILITY_WEIGHT = Decimal("0.20")
+# Fase 5: rebalanceado de 25/20/20/20/15 pra caber o 6o componente
+# (opportunity_followup), mantendo a soma em 100.
+RECENCY_WEIGHT = Decimal("0.20")
+FREQUENCY_WEIGHT = Decimal("0.15")
+ENGAGEMENT_WEIGHT = Decimal("0.15")
+AUM_STABILITY_WEIGHT = Decimal("0.15")
 OPEN_TASKS_WEIGHT = Decimal("0.15")
+OPPORTUNITY_FOLLOWUP_WEIGHT = Decimal("0.20")
+
+
+def classify_contact_status(days_since_contact: int | None, cadence_days: int) -> str:
+    """overdue | approaching | ok -- extraido de clients.relationship_overview
+    pra ser reaproveitado tambem no calculo de contact_coverage do assessor
+    (Advisor Analytics, Fase 5)."""
+    if days_since_contact is None or days_since_contact > cadence_days:
+        return "overdue"
+    if days_since_contact > cadence_days * 0.7:
+        return "approaching"
+    return "ok"
 
 
 @dataclass
@@ -53,7 +67,7 @@ def _score_over_cadence(days_over_ratio: float) -> int:
 
 def compute_relationship_score(
     db, org_id, client, interactions: list, tasks: list, aum_history: list[Decimal],
-    today: date | None = None, cache: dict | None = None,
+    open_opportunities: list | None = None, today: date | None = None, cache: dict | None = None,
 ) -> RelationshipScoreResult:
     today = today or date.today()
     components: dict[str, int] = {}
@@ -114,12 +128,28 @@ def compute_relationship_score(
     else:
         explanation.append("Nenhum follow-up pendente")
 
+    # Opportunity follow-up: oportunidades detectadas e ainda nao revisadas
+    # ha mais tempo que o threshold penalizam -- mesmo padrao de open_tasks
+    stale_days = int(get_threshold(db, "opportunity_followup_stale_days", org_id, client, cache=cache))
+    stale_opportunities = [
+        o for o in (open_opportunities or [])
+        if o.status == "detected" and (today - o.created_at.date()).days > stale_days
+    ]
+    components["opportunity_followup"] = max(0, 100 - len(stale_opportunities) * 20)
+    if stale_opportunities:
+        explanation.append(
+            f"{len(stale_opportunities)} oportunidade(s) detectada(s) ha mais de {stale_days} dias sem revisao"
+        )
+    else:
+        explanation.append("Nenhuma oportunidade parada sem revisão")
+
     score = round(
         components["recency"] * RECENCY_WEIGHT
         + components["frequency"] * FREQUENCY_WEIGHT
         + components["engagement"] * ENGAGEMENT_WEIGHT
         + components["aum_stability"] * AUM_STABILITY_WEIGHT
         + components["open_tasks"] * OPEN_TASKS_WEIGHT
+        + components["opportunity_followup"] * OPPORTUNITY_FOLLOWUP_WEIGHT
     )
 
     good = get_threshold(db, "relationship_score_good", org_id, client, cache=cache)
@@ -135,7 +165,52 @@ COMPONENT_LABELS = {
     "engagement": "Engajamento",
     "aum_stability": "Estabilidade de patrimônio",
     "open_tasks": "Follow-ups em dia",
+    "opportunity_followup": "Follow-up de oportunidades",
 }
+
+
+def batch_compute_relationship_scores(db, org_id, client_ids: list, cache: dict) -> dict:
+    """Mesmo calculo de compute_relationship_score, mas buscando
+    snapshots/interactions/tasks/opportunities de varios clientes de uma vez
+    (client_ids.in_(...)) em vez de 1 query por cliente -- usado onde se
+    precisa da banda/score de varios clientes na mesma request sem repetir
+    o padrao de batching ja usado em clients.list_clients (ex: Advisor
+    Analytics, Fase 5)."""
+    from app.models import Client, ClientDailySnapshot, ClientInteraction, Task, Opportunity
+
+    if not client_ids:
+        return {}
+
+    clients = db.query(Client).filter(Client.id.in_(client_ids)).all()
+
+    snapshots_by_client: dict = {}
+    for s in db.query(ClientDailySnapshot).filter(ClientDailySnapshot.client_id.in_(client_ids)).order_by(ClientDailySnapshot.client_id, ClientDailySnapshot.snapshot_date).all():
+        snapshots_by_client.setdefault(s.client_id, []).append(s)
+
+    interactions_by_client: dict = {}
+    for i in db.query(ClientInteraction).filter(ClientInteraction.client_id.in_(client_ids)).all():
+        interactions_by_client.setdefault(i.client_id, []).append(i)
+
+    tasks_by_client: dict = {}
+    for t in db.query(Task).filter(Task.client_id.in_(client_ids)).all():
+        tasks_by_client.setdefault(t.client_id, []).append(t)
+
+    opportunities_by_client: dict = {}
+    for o in db.query(Opportunity).filter(Opportunity.client_id.in_(client_ids)).all():
+        opportunities_by_client.setdefault(o.client_id, []).append(o)
+
+    results = {}
+    for client in clients:
+        client_snapshots = snapshots_by_client.get(client.id, [])
+        results[client.id] = compute_relationship_score(
+            db, org_id, client,
+            interactions=interactions_by_client.get(client.id, []),
+            tasks=tasks_by_client.get(client.id, []),
+            aum_history=[s.aum for s in client_snapshots],
+            open_opportunities=opportunities_by_client.get(client.id, []),
+            cache=cache,
+        )
+    return results
 
 
 def score_breakdown(result: RelationshipScoreResult) -> list[ScoreBreakdownItem]:

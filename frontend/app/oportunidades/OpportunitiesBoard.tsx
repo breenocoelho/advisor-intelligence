@@ -16,6 +16,7 @@ export type OpportunityItem = {
   confidence: number | null;
   score: number | null;
   explanation: string | null;
+  recommended_action: string | null;
   created_at: string | null;
 };
 
@@ -101,6 +102,9 @@ export default function OpportunitiesBoard({ opportunities }: { opportunities: O
               </span>
             </div>
             <p className="mt-1 text-sm text-[#14181F]/70">{opp.explanation}</p>
+            {opp.recommended_action && (
+              <p className="mt-1 text-sm font-medium text-[#3E5C76]">→ {opp.recommended_action}</p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#14181F]/50">
               <span>Valor potencial: <span className="font-mono tabular-nums">{formatCurrency(opp.potential_value)}</span></span>
               <span>Score: <span className="font-mono font-semibold tabular-nums" style={{ color: scoreColor(opp.score) }}>{opp.score ?? "—"}</span></span>

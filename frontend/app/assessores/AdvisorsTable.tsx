@@ -10,9 +10,10 @@ type Advisor = {
   client_count: number;
   net_flow: number;
   aum_growth_pct: number | null;
+  opportunity_count: number;
 };
 
-type SortKey = "aum" | "client_count" | "net_flow" | "aum_growth_pct";
+type SortKey = "aum" | "client_count" | "net_flow" | "aum_growth_pct" | "opportunity_count";
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -44,6 +45,7 @@ export default function AdvisorsTable({ advisors }: { advisors: Advisor[] }) {
             <th className="px-4 py-3 text-right">{headerButton("aum_growth_pct", "Crescimento")}</th>
             <th className="px-4 py-3 text-right">{headerButton("net_flow", "Net Flow")}</th>
             <th className="px-4 py-3 text-right">{headerButton("client_count", "Clientes")}</th>
+            <th className="px-4 py-3 text-right">{headerButton("opportunity_count", "Oportunidades")}</th>
           </tr>
         </thead>
         <tbody>
@@ -71,6 +73,7 @@ export default function AdvisorsTable({ advisors }: { advisors: Advisor[] }) {
                 </span>
               </td>
               <td className="px-4 py-3 text-right font-mono tabular-nums text-[#14181F]/70">{advisor.client_count}</td>
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-[#14181F]/70">{advisor.opportunity_count}</td>
             </tr>
           ))}
         </tbody>

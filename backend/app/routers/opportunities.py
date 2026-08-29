@@ -7,12 +7,20 @@ from app.models import Opportunity, Client
 from app.schemas import OpportunityOut, OpportunityStatusIn
 from app.routers.clients import resolve_org_id
 from app.services.audit import log_action
+from app.services.intelligence.opportunity_engine import RECOMMENDED_ACTION_BY_TYPE
 
 VALID_STATUSES = {
     "detected", "reviewed", "assigned", "contacted", "proposal", "executed", "won", "lost", "closed",
 }
 
 router = APIRouter()
+
+
+def _build_opportunity_out(opportunity: Opportunity, client_name: str | None) -> OpportunityOut:
+    item = OpportunityOut.model_validate(opportunity)
+    item.client_name = client_name
+    item.recommended_action = RECOMMENDED_ACTION_BY_TYPE.get(opportunity.opportunity_type)
+    return item
 
 
 @router.get("/", response_model=list[OpportunityOut])
@@ -35,12 +43,7 @@ def list_opportunities(
 
     rows = query.order_by(Opportunity.score.desc().nullslast()).all()
 
-    results = []
-    for opportunity, client_name in rows:
-        item = OpportunityOut.model_validate(opportunity)
-        item.client_name = client_name
-        results.append(item)
-    return results
+    return [_build_opportunity_out(opportunity, client_name) for opportunity, client_name in rows]
 
 
 @router.get("/{opportunity_id}", response_model=OpportunityOut)
@@ -60,9 +63,7 @@ def get_opportunity(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Oportunidade não encontrada")
 
     opportunity, client_name = row
-    item = OpportunityOut.model_validate(opportunity)
-    item.client_name = client_name
-    return item
+    return _build_opportunity_out(opportunity, client_name)
 
 
 @router.patch("/{opportunity_id}", response_model=OpportunityOut)
@@ -96,6 +97,4 @@ def update_opportunity_status(
     db.commit()
     db.refresh(opportunity)
 
-    item = OpportunityOut.model_validate(opportunity)
-    item.client_name = client.name if client else None
-    return item
+    return _build_opportunity_out(opportunity, client.name if client else None)

@@ -9,6 +9,8 @@ import WhatChangedCard from "../../WhatChangedCard";
 type TrendPoint = { snapshot_date: string; aum: number | null; client_count: number | null; net_flow: number | null };
 type ProductMixAssetItem = { asset_id: string; asset_name: string; value: number; pct_of_class: number };
 type ProductMixItem = { asset_class: string; value: number; pct: number; assets: ProductMixAssetItem[] };
+type OpportunityDistributionItem = { opportunity_type: string; count: number };
+type AdvisorKeyInsight = { text: string; severity: "critical" | "opportunity" | "follow_up"; client_id: string; client_name: string };
 
 type AdvisorDetail = {
   id: string;
@@ -19,7 +21,23 @@ type AdvisorDetail = {
   avg_aum_per_client: number;
   trend: TrendPoint[];
   product_mix: ProductMixItem[];
+  contact_coverage_pct: number | null;
+  relationship_coverage_pct: number | null;
+  retention_pct: number | null;
+  opportunity_distribution: OpportunityDistributionItem[];
+  key_insights: AdvisorKeyInsight[];
 };
+
+const OPPORTUNITY_TYPE_LABELS: Record<string, string> = {
+  idle_cash: "Caixa ociosa",
+  upcoming_maturity: "Vencimento próximo",
+};
+
+const KEY_INSIGHT_SEVERITY_CONFIG = {
+  critical: { accent: "#B23A48" },
+  opportunity: { accent: "#A6790A" },
+  follow_up: { accent: "#3E5C76" },
+} as const;
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -59,6 +77,30 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
         <h1 className="font-display text-4xl font-semibold tracking-tight">{advisor.name}</h1>
       </header>
 
+      {advisor.key_insights.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">Key Insights</h2>
+          <div className="card divide-y divide-[#14181F]/5">
+            {advisor.key_insights.map((item, i) => {
+              const config = KEY_INSIGHT_SEVERITY_CONFIG[item.severity];
+              return (
+                <Link
+                  key={i}
+                  href={`/clientes/${item.client_id}`}
+                  className="flex items-start gap-3 p-3 transition hover:bg-[#14181F]/[0.02]"
+                >
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: config.accent }} />
+                  <span className="text-sm">
+                    <span className="font-medium">{item.client_name}</span>
+                    <span className="text-[#14181F]/70"> — {item.text}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="card p-4">
           <p className="text-xs uppercase tracking-wide text-[#14181F]/40">AUM</p>
@@ -84,6 +126,43 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
           </p>
         </div>
       </section>
+
+      <section className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Contact Coverage</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">
+            {advisor.contact_coverage_pct !== null ? `${advisor.contact_coverage_pct.toFixed(0)}%` : "—"}
+          </p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Relationship Coverage</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">
+            {advisor.relationship_coverage_pct !== null ? `${advisor.relationship_coverage_pct.toFixed(0)}%` : "—"}
+          </p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Retention</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">
+            {advisor.retention_pct !== null ? `${advisor.retention_pct.toFixed(0)}%` : "—"}
+          </p>
+        </div>
+      </section>
+
+      {advisor.opportunity_distribution.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#14181F]/70">
+            Distribuição de Oportunidades
+          </h2>
+          <div className="card divide-y divide-[#14181F]/5">
+            {advisor.opportunity_distribution.map((item) => (
+              <div key={item.opportunity_type} className="flex items-center justify-between p-3">
+                <span className="text-sm">{OPPORTUNITY_TYPE_LABELS[item.opportunity_type] ?? item.opportunity_type}</span>
+                <span className="font-mono text-sm font-semibold tabular-nums">{item.count}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <WhatChangedCard whatChangedUrl={`/advisors/${advisor.id}/what-changed`} />
 

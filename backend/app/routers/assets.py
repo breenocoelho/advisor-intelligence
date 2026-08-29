@@ -143,6 +143,13 @@ def get_asset_detail(
         for position, client in latest_rows
     ]
 
+    # Asset Intelligence stats (Prioridade 10, Fase 5) -- derivados do
+    # client_positions ja montado acima, zero query nova
+    item.client_count = len(item.client_positions)
+    item.total_exposure = sum(p.market_value for p in item.client_positions)
+    item.average_exposure = item.total_exposure / item.client_count if item.client_count else 0.0
+    item.largest_exposure = max((p.market_value for p in item.client_positions), default=0.0)
+
     # Distribution by advisor (Prioridade 10 -- Cross-Client/Asset
     # Intelligence): mesmos latest_rows ja buscados, so' agrupados pelo
     # assessor atual de cada cliente em vez de por cliente.

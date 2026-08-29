@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import (
     clients, alerts, tasks, insights, threshold_rules, assets, advisors, interactions, benchmarks, config,
-    opportunities,
+    opportunities, office,
 )
 
 app = FastAPI(title="Advisor Intelligence API")
@@ -25,6 +25,7 @@ app.include_router(interactions.router, prefix="/clients", tags=["interactions"]
 app.include_router(benchmarks.router, prefix="/benchmarks", tags=["benchmarks"])
 app.include_router(config.router, prefix="/config", tags=["config"])
 app.include_router(opportunities.router, prefix="/opportunities", tags=["opportunities"])
+app.include_router(office.router, prefix="/office", tags=["office"])
 
 
 @app.get("/health")

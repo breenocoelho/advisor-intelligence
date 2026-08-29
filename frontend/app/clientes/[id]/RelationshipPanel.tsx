@@ -20,6 +20,7 @@ const COMPONENT_LABELS: Record<string, string> = {
   engagement: "Engagement",
   aum_stability: "AUM stability",
   open_tasks: "Open Tasks",
+  opportunity_followup: "Opportunity Follow-up",
 };
 
 function scoreColor(score: number): string {
@@ -83,7 +84,7 @@ export default function RelationshipPanel({ client }: { client: ClientDetail }) 
               </div>
             </div>
             {client.relationship_score_components && (
-              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#14181F]/10 pt-4 sm:grid-cols-5">
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#14181F]/10 pt-4 sm:grid-cols-3 lg:grid-cols-6">
                 {Object.entries(client.relationship_score_components).map(([key, value]) => (
                   <div key={key}>
                     <p className="text-xs uppercase tracking-wide text-[#14181F]/40">

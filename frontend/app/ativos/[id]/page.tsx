@@ -65,6 +65,10 @@ type AssetDetail = {
   tasks: TaskRow[];
   client_positions: ClientPosition[];
   distribution_by_advisor: AdvisorExposure[];
+  total_exposure: number;
+  client_count: number;
+  average_exposure: number;
+  largest_exposure: number;
 };
 
 const ASSET_CLASS_LABELS: Record<string, string> = {
@@ -147,6 +151,22 @@ export default async function Asset360Page({ params }: { params: Promise<{ id: s
           <p className="text-sm text-[#14181F]/50">exposição total do escritório</p>
         </div>
       </header>
+
+      {/* Asset Intelligence stats */}
+      <section className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Clientes expostos</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">{asset.client_count}</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Exposição média</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">{formatCurrency(asset.average_exposure)}</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#14181F]/40">Maior exposição</p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums">{formatCurrency(asset.largest_exposure)}</p>
+        </div>
+      </section>
 
       {/* Cadastro */}
       <section className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
